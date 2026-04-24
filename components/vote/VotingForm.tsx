@@ -7,6 +7,7 @@ interface Option {
   id: string
   label: string
   dateValue: string | null
+  endDate: string | null
 }
 
 interface Props {
@@ -23,10 +24,12 @@ export function VotingForm({ token, pollType, options, participantName, optOutUr
   const [selected, setSelected] = useState<string>("")
   const [error, setError] = useState("")
 
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString("en-US", {
-      weekday: "long", month: "long", day: "numeric", year: "numeric",
-    })
+  function formatDateRange(start: string, end: string | null) {
+    const s = new Date(start)
+    if (!end) return s.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+    const e = new Date(end)
+    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+    return `${fmt(s)} – ${fmt(e)}, ${e.getFullYear()}`
   }
 
   async function handleVote() {
@@ -109,7 +112,7 @@ export function VotingForm({ token, pollType, options, participantName, optOutUr
         >
           <p className="font-medium text-gray-900">{opt.label}</p>
           {opt.dateValue && (
-            <p className="text-sm text-gray-500 mt-0.5">{formatDate(opt.dateValue)}</p>
+            <p className="text-sm text-gray-500 mt-0.5">{formatDateRange(opt.dateValue, opt.endDate)}</p>
           )}
         </button>
       ))}

@@ -38,10 +38,11 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
         initialData={{
           status: poll.status,
           winnerId: poll.winnerId,
-          winner: poll.winner ? { id: poll.winner.id, label: poll.winner.label, dateValue: poll.winner.dateValue?.toISOString() ?? null } : null,
+          winner: poll.winner ? { id: poll.winner.id, label: poll.winner.label, dateValue: poll.winner.dateValue?.toISOString() ?? null, endDate: poll.winner.endDate?.toISOString() ?? null } : null,
           options: poll.options.map((o) => ({
             id: o.id, label: o.label,
             dateValue: o.dateValue?.toISOString() ?? null,
+            endDate: o.endDate?.toISOString() ?? null,
             voteCount: 0,
           })),
           participants: poll.participants.map((p) => ({

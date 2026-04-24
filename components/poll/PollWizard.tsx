@@ -9,7 +9,7 @@ interface Group { id: string; name: string; members: GroupMember[] }
 interface Props { groups: Group[] }
 
 type PollType = "DATE_POLL" | "SINGLE_CHOICE" | "YES_NO_VETO"
-interface Option { label: string; dateValue: string }
+interface Option { label: string; dateValue: string; endDate: string }
 interface Invitee { name: string; email: string }
 
 export function PollWizard({ groups }: Props) {
@@ -25,8 +25,8 @@ export function PollWizard({ groups }: Props) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [options, setOptions] = useState<Option[]>([
-    { label: "", dateValue: "" },
-    { label: "", dateValue: "" },
+    { label: "", dateValue: "", endDate: "" },
+    { label: "", dateValue: "", endDate: "" },
   ])
 
   // Step 3 — group/invitees, deadline, threshold
@@ -42,7 +42,7 @@ export function PollWizard({ groups }: Props) {
     ...extraInvitees.filter((e) => e.name && e.email),
   ]
 
-  function addOption() { setOptions((o) => [...o, { label: "", dateValue: "" }]) }
+  function addOption() { setOptions((o) => [...o, { label: "", dateValue: "", endDate: "" }]) }
   function removeOption(i: number) { setOptions((o) => o.filter((_, idx) => idx !== i)) }
   function updateOption(i: number, field: keyof Option, val: string) {
     setOptions((o) => o.map((opt, idx) => idx === i ? { ...opt, [field]: val } : opt))
@@ -82,6 +82,7 @@ export function PollWizard({ groups }: Props) {
         : options.filter((o) => o.label.trim()).map((o) => ({
             label: o.label.trim(),
             dateValue: o.dateValue ? new Date(o.dateValue).toISOString() : undefined,
+            endDate: o.endDate ? new Date(o.endDate).toISOString() : undefined,
           })),
       groupId: groupId || undefined,
       invitees: allInvitees,
@@ -168,26 +169,43 @@ export function PollWizard({ groups }: Props) {
           {pollType !== "YES_NO_VETO" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Options</label>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {options.map((opt, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder={pollType === "DATE_POLL" ? "Label (e.g. Saturday the 5th)" : `Option ${i + 1}`}
-                      value={opt.label}
-                      onChange={(e) => updateOption(i, "label", e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                    />
-                    {pollType === "DATE_POLL" && (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex gap-2">
                       <input
-                        type="datetime-local"
-                        value={opt.dateValue}
-                        onChange={(e) => updateOption(i, "dateValue", e.target.value)}
-                        className="rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                        type="text"
+                        placeholder={pollType === "DATE_POLL" ? "Label (e.g. Beach weekend)" : `Option ${i + 1}`}
+                        value={opt.label}
+                        onChange={(e) => updateOption(i, "label", e.target.value)}
+                        className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                       />
-                    )}
-                    {options.length > 2 && (
-                      <button type="button" onClick={() => removeOption(i)} className="text-gray-400 hover:text-red-500">✕</button>
+                      {options.length > 2 && (
+                        <button type="button" onClick={() => removeOption(i)} className="text-gray-400 hover:text-red-500">✕</button>
+                      )}
+                    </div>
+                    {pollType === "DATE_POLL" && (
+                      <div className="flex gap-2 items-center ml-0.5">
+                        <div className="flex-1">
+                          <label className="block text-xs text-gray-400 mb-0.5">Start date</label>
+                          <input
+                            type="date"
+                            value={opt.dateValue ? opt.dateValue.slice(0, 10) : ""}
+                            onChange={(e) => updateOption(i, "dateValue", e.target.value ? `${e.target.value}T00:00` : "")}
+                            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs text-gray-400 mb-0.5">End date <span className="text-gray-300">(optional)</span></label>
+                          <input
+                            type="date"
+                            value={opt.endDate ? opt.endDate.slice(0, 10) : ""}
+                            min={opt.dateValue ? opt.dateValue.slice(0, 10) : undefined}
+                            onChange={(e) => updateOption(i, "endDate", e.target.value ? `${e.target.value}T00:00` : "")}
+                            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
                 ))}

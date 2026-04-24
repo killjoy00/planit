@@ -57,6 +57,7 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
             id: o.id,
             label: o.label,
             dateValue: o.dateValue ? o.dateValue.toISOString() : null,
+            endDate: o.endDate ? o.endDate.toISOString() : null,
           }))}
           participantName={participant.name}
           optOutUrl={`/vote/${token}/opted-out`}

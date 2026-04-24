@@ -13,6 +13,7 @@ const schema = z.object({
   options: z.array(z.object({
     label: z.string().min(1),
     dateValue: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
   })).min(1),
   groupId: z.string().optional(),
   invitees: z.array(inviteeSchema).min(1),
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
         create: options.map((opt, i) => ({
           label: opt.label,
           dateValue: opt.dateValue ? new Date(opt.dateValue) : null,
+          endDate: opt.endDate ? new Date(opt.endDate) : null,
           order: i,
         })),
       },
@@ -60,6 +62,13 @@ export async function POST(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
   const creatorName = poll.creator.name ?? poll.creator.email ?? "Someone"
 
+  function formatDateRange(start: Date | null, end: Date | null): string | undefined {
+    if (!start) return undefined
+    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    if (!end) return start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+    return `${fmt(start)} – ${fmt(end)}, ${end.getFullYear()}`
+  }
+
   await Promise.allSettled(
     poll.participants.map((p) =>
       sendInviteEmail({
@@ -71,7 +80,10 @@ export async function POST(req: NextRequest) {
         pollType: poll.type,
         voteUrl: `${appUrl}/vote/${p.token}`,
         deadline: poll.deadline ?? undefined,
-        options: poll.options.map((o) => o.label),
+        options: poll.options.map((o) => ({
+          label: o.label,
+          dateStr: formatDateRange(o.dateValue, o.endDate),
+        })),
       })
     )
   )

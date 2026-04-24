@@ -20,7 +20,7 @@ export default function InviteEmail({
         Hey {firstName},
       </Text>
       <Text style={{ fontSize: "16px", color: "#374151", margin: "0 0 4px" }}>
-        <strong>{creatorName}</strong> is planning <strong>{pollTitle}</strong> and wants to know if you&apos;re in.
+        {creatorName} is planning &ldquo;{pollTitle}&rdquo; and wants to know if you&apos;re in.
       </Text>
       {pollDescription && (
         <Text style={{ fontSize: "14px", color: "#6b7280", margin: "8px 0 0" }}>
@@ -31,7 +31,10 @@ export default function InviteEmail({
         <Section style={{ margin: "16px 0 0", padding: "16px", backgroundColor: "#f9fafb", borderRadius: "8px" }}>
           {options.slice(0, 4).map((opt, i) => (
             <Text key={i} style={{ margin: "4px 0", fontSize: "14px", color: "#374151" }}>
-              • {opt}
+              {opt.dateStr
+                ? <>{"•"} {opt.label} <span style={{ color: "#6b7280" }}>({opt.dateStr})</span></>
+                : <>{"•"} {opt.label}</>
+              }
             </Text>
           ))}
           {options.length > 4 && (

@@ -18,7 +18,7 @@ export interface InviteEmailProps {
   pollType: string
   voteUrl: string
   deadline?: Date
-  options: string[]
+  options: Array<{ label: string; dateStr?: string }>
 }
 
 export interface ReminderEmailProps {
