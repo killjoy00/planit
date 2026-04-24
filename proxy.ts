@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 
 const protectedPrefixes = ["/dashboard", "/groups", "/polls"]
+const CANONICAL_HOST = "planitnow.us"
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, search } = request.nextUrl
+  const host = request.headers.get("host") ?? ""
+
+  if (host.endsWith(".vercel.app")) {
+    return NextResponse.redirect(`https://${CANONICAL_HOST}${pathname}${search}`, 308)
+  }
+
   const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p))
   if (!isProtected) return NextResponse.next()
 
@@ -22,5 +29,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|vote).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 }
+
