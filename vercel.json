@@ -1,12 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/reminders",
+      "path": "/api/cron/daily",
       "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/auto-close",
-      "schedule": "*/15 * * * *"
     }
   ]
 }
