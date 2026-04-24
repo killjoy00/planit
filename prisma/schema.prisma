@@ -97,9 +97,10 @@ model Poll {
   group          Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
   options        PollOption[]
   participants   Participant[]
-  deadline       DateTime?
-  threshold      Int?
-  reminderLevel  Int           @default(0)
+  deadline          DateTime?
+  threshold         Int?
+  allowSuggestions  Boolean       @default(false)
+  reminderLevel     Int           @default(0)
   lastReminderAt DateTime?
   winnerId       String?
   winner         PollOption?   @relation("PollWinner", fields: [winnerId], references: [id], onDelete: SetNull)
@@ -126,10 +127,11 @@ model PollOption {
   id        String     @id @default(cuid())
   pollId    String
   poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  label     String
-  dateValue DateTime?
-  endDate   DateTime?
-  order     Int        @default(0)
+  label            String
+  dateValue        DateTime?
+  endDate          DateTime?
+  suggestedByName  String?
+  order            Int       @default(0)
   votes     Vote[]
   wonPolls  Poll[]     @relation("PollWinner")
   createdAt DateTime   @default(now())

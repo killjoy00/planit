@@ -29,11 +29,12 @@ export function PollWizard({ groups }: Props) {
     { label: "", dateValue: "", endDate: "" },
   ])
 
-  // Step 3 — group/invitees, deadline, threshold
+  // Step 3 — group/invitees, deadline, threshold, suggestions
   const [groupId, setGroupId] = useState("")
   const [extraInvitees, setExtraInvitees] = useState<Invitee[]>([])
   const [deadline, setDeadline] = useState("")
   const [threshold, setThreshold] = useState("")
+  const [allowSuggestions, setAllowSuggestions] = useState(false)
 
   const selectedGroup = groups.find((g) => g.id === groupId)
   const groupMembers: Invitee[] = selectedGroup?.members ?? []
@@ -88,6 +89,7 @@ export function PollWizard({ groups }: Props) {
       invitees: allInvitees,
       deadline: deadline ? new Date(deadline).toISOString() : undefined,
       threshold: threshold ? parseInt(threshold) : undefined,
+      allowSuggestions,
     }
 
     startTransition(async () => {
@@ -286,6 +288,23 @@ export function PollWizard({ groups }: Props) {
               />
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setAllowSuggestions((v) => !v)}
+            className={`w-full flex items-center justify-between rounded-xl border-2 px-4 py-3 transition-all ${
+              allowSuggestions ? "border-indigo-500 bg-indigo-50" : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            <div className="text-left">
+              <p className="text-sm font-medium text-gray-900">Allow participants to suggest options</p>
+              <p className="text-xs text-gray-500 mt-0.5">Anyone can add a new option while voting</p>
+            </div>
+            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
+              allowSuggestions ? "border-indigo-500 bg-indigo-500" : "border-gray-300"
+            }`}>
+              {allowSuggestions && <span className="text-white text-xs font-bold">✓</span>}
+            </div>
+          </button>
         </div>
       )}
 

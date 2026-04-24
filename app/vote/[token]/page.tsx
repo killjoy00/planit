@@ -61,6 +61,7 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
           }))}
           participantName={participant.name}
           optOutUrl={`/vote/${token}/opted-out`}
+          allowSuggestions={participant.poll.allowSuggestions}
         />
       </div>
     </main>

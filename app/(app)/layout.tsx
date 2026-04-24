@@ -15,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             planit
           </Link>
           <nav className="flex items-center gap-4 text-sm">
+            <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Dashboard</Link>
             <Link href="/groups" className="text-gray-600 hover:text-gray-900">Groups</Link>
             <Link
               href="/polls/new"

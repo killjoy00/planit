@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     status: poll.status,
     winnerId: poll.winnerId,
     winner: poll.winner,
-    options: poll.options.map((o) => ({ id: o.id, label: o.label, dateValue: o.dateValue, endDate: o.endDate, voteCount: o.votes.length })),
+    options: poll.options.map((o) => ({ id: o.id, label: o.label, dateValue: o.dateValue, endDate: o.endDate, suggestedByName: o.suggestedByName, voteCount: o.votes.length })),
     participants: poll.participants.map((p) => ({
       id: p.id, name: p.name, email: p.email,
       voted: !!p.votedAt, optedOut: p.optedOut,

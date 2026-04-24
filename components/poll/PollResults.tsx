@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react"
 
-interface Option { id: string; label: string; dateValue: string | null; endDate: string | null; voteCount: number }
+interface Option { id: string; label: string; dateValue: string | null; endDate: string | null; suggestedByName: string | null; voteCount: number }
 interface Participant { id: string; name: string; email: string; voted: boolean; optedOut: boolean; vote: { optionId: string | null; choice: string | null } | null }
 interface Winner { id: string; label: string; dateValue: string | null; endDate: string | null }
 
@@ -35,6 +35,43 @@ function formatDateRange(start: string | null, end: string | null): string | nul
 export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvailable: initialIcsAvailable, pollIdForIcs }: Props) {
   const [data, setData] = useState(initialData)
   const [isClosing, startClose] = useTransition()
+  const [showAddInvite, setShowAddInvite] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [newEmail, setNewEmail] = useState("")
+  const [isAdding, setIsAdding] = useState(false)
+  const [addError, setAddError] = useState("")
+  const [addSuccess, setAddSuccess] = useState("")
+
+  async function handleAddInvite() {
+    if (!newName.trim() || !newEmail.trim()) {
+      setAddError("Name and email are both required.")
+      return
+    }
+    setIsAdding(true)
+    setAddError("")
+    setAddSuccess("")
+    try {
+      const res = await fetch(`/api/polls/${pollId}/participants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitees: [{ name: newName.trim(), email: newEmail.trim() }] }),
+      })
+      if (!res.ok) {
+        const body = await res.json()
+        setAddError(typeof body.error === "string" ? body.error : "Could not add participant.")
+        return
+      }
+      setAddSuccess(`Invite sent to ${newEmail.trim()}.`)
+      setNewName("")
+      setNewEmail("")
+      const fresh = await fetch(`/api/polls/${pollId}/results`)
+      if (fresh.ok) setData(hydrated(await fresh.json()))
+    } catch {
+      setAddError("Something went wrong.")
+    } finally {
+      setIsAdding(false)
+    }
+  }
 
   // Hydrate vote counts from participants
   function hydrated(d: ResultsData): ResultsData {
@@ -110,8 +147,15 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
               return (
                 <div key={opt.id} className="flex items-center gap-3">
                   <div className="flex-1">
-                    <div className="flex justify-between text-sm mb-0.5">
-                      <span className="font-medium text-gray-800">{opt.label}</span>
+                    <div className="flex justify-between text-sm mb-0.5 gap-2">
+                      <span className="font-medium text-gray-800">
+                        {opt.label}
+                        {opt.suggestedByName && (
+                          <span className="ml-2 text-xs font-normal text-indigo-500 bg-indigo-50 rounded px-1.5 py-0.5">
+                            suggested by {opt.suggestedByName}
+                          </span>
+                        )}
+                      </span>
                       <span className="text-gray-500">{opt.voteCount}</span>
                     </div>
                     {dateStr && <p className="text-xs text-gray-400 mb-1">{dateStr}</p>}
@@ -143,7 +187,46 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
       </div>
 
       <div>
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Participants</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium text-gray-700">Participants</h3>
+          {h.status === "OPEN" && (
+            <button
+              onClick={() => setShowAddInvite((v) => !v)}
+              className="text-sm text-indigo-600 hover:underline"
+            >
+              {showAddInvite ? "Cancel" : "+ Invite more"}
+            </button>
+          )}
+        </div>
+        {showAddInvite && h.status === "OPEN" && (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 mb-3 space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+              />
+              <button
+                onClick={handleAddInvite}
+                disabled={isAdding}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {isAdding ? "Sending…" : "Send invite"}
+              </button>
+            </div>
+            {addError && <p className="text-xs text-red-600">{addError}</p>}
+            {addSuccess && <p className="text-xs text-green-600">{addSuccess}</p>}
+          </div>
+        )}
         <div className="space-y-1">
           {h.participants.map((p) => {
             const votedOption = p.vote?.optionId ? h.options.find((o) => o.id === p.vote?.optionId) : null

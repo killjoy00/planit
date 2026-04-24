@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
+import Link from "next/link"
 import { PollResults } from "@/components/poll/PollResults"
 
 export default async function PollPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,6 +23,9 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="space-y-6">
+      <Link href="/dashboard" className="inline-flex items-center text-sm text-gray-500 hover:text-indigo-600">
+        ← Back to dashboard
+      </Link>
       <div>
         <div className="flex items-center gap-2">
           {poll.group && <span className="text-sm text-gray-500">{poll.group.name} ·</span>}
@@ -43,6 +47,7 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
             id: o.id, label: o.label,
             dateValue: o.dateValue?.toISOString() ?? null,
             endDate: o.endDate?.toISOString() ?? null,
+            suggestedByName: o.suggestedByName,
             voteCount: 0,
           })),
           participants: poll.participants.map((p) => ({

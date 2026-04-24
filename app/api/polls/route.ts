@@ -19,6 +19,7 @@ const schema = z.object({
   invitees: z.array(inviteeSchema).min(1),
   deadline: z.string().datetime().optional(),
   threshold: z.number().int().positive().optional(),
+  allowSuggestions: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
-  const { title, description, type, options, groupId, invitees, deadline, threshold } = parsed.data
+  const { title, description, type, options, groupId, invitees, deadline, threshold, allowSuggestions } = parsed.data
 
   const poll = await db.poll.create({
     data: {
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
       groupId: groupId || null,
       deadline: deadline ? new Date(deadline) : null,
       threshold: threshold ?? null,
+      allowSuggestions: allowSuggestions ?? false,
       options: {
         create: options.map((opt, i) => ({
           label: opt.label,

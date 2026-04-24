@@ -16,13 +16,18 @@ interface Props {
   options: Option[]
   participantName: string
   optOutUrl: string
+  allowSuggestions: boolean
 }
 
-export function VotingForm({ token, pollType, options, participantName, optOutUrl }: Props) {
+export function VotingForm({ token, pollType, options: initialOptions, participantName, optOutUrl, allowSuggestions }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [options, setOptions] = useState(initialOptions)
   const [selected, setSelected] = useState<string>("")
   const [error, setError] = useState("")
+  const [suggestion, setSuggestion] = useState("")
+  const [isSuggesting, setIsSuggesting] = useState(false)
+  const [suggestionError, setSuggestionError] = useState("")
 
   function formatDateRange(start: string, end: string | null) {
     const s = new Date(start)
@@ -54,6 +59,32 @@ export function VotingForm({ token, pollType, options, participantName, optOutUr
       }
       router.push(`/vote/${token}/done`)
     })
+  }
+
+  async function handleSuggest() {
+    if (!suggestion.trim()) return
+    setIsSuggesting(true)
+    setSuggestionError("")
+    try {
+      const res = await fetch(`/api/vote/${token}/suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: suggestion.trim() }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setSuggestionError(data.error ?? "Could not add suggestion.")
+        return
+      }
+      const newOpt = await res.json()
+      setOptions((prev) => [...prev, { id: newOpt.id, label: newOpt.label, dateValue: null, endDate: null }])
+      setSelected(newOpt.id)
+      setSuggestion("")
+    } catch {
+      setSuggestionError("Something went wrong.")
+    } finally {
+      setIsSuggesting(false)
+    }
   }
 
   if (pollType === "YES_NO_VETO") {
@@ -116,6 +147,30 @@ export function VotingForm({ token, pollType, options, participantName, optOutUr
           )}
         </button>
       ))}
+      {allowSuggestions && (
+        <div className="rounded-xl border-2 border-dashed border-gray-200 px-4 py-3 space-y-2">
+          <p className="text-sm font-medium text-gray-600">Don&apos;t see the right option? Suggest one:</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Your suggestion…"
+              value={suggestion}
+              onChange={(e) => setSuggestion(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSuggest()}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleSuggest}
+              disabled={isSuggesting || !suggestion.trim()}
+              className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-40"
+            >
+              {isSuggesting ? "Adding…" : "Add"}
+            </button>
+          </div>
+          {suggestionError && <p className="text-xs text-red-600">{suggestionError}</p>}
+        </div>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         onClick={handleVote}

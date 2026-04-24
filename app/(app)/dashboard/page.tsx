@@ -7,7 +7,7 @@ export default async function DashboardPage() {
   const session = await auth()
   const userId = session!.user!.id!
 
-  const [openPolls, groups] = await Promise.all([
+  const [openPolls, pastPolls, groups] = await Promise.all([
     db.poll.findMany({
       where: { creatorId: userId, status: "OPEN" },
       include: {
@@ -16,6 +16,16 @@ export default async function DashboardPage() {
       },
       orderBy: { createdAt: "desc" },
     }),
+    db.poll.findMany({
+      where: { creatorId: userId, status: { not: "OPEN" } },
+      include: {
+        participants: { select: { id: true, votedAt: true, optedOut: true } },
+        group: { select: { name: true } },
+        winner: { select: { label: true, dateValue: true, endDate: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 20,
+    }),
     db.group.findMany({
       where: { creatorId: userId },
       include: { members: { select: { id: true } } },
@@ -23,6 +33,13 @@ export default async function DashboardPage() {
       take: 5,
     }),
   ])
+
+  function formatWinnerDate(start: Date | null, end: Date | null): string | null {
+    if (!start) return null
+    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    if (!end) return start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    return `${fmt(start)} – ${fmt(end)}, ${end.getFullYear()}`
+  }
 
   return (
     <div className="space-y-8">
@@ -62,6 +79,40 @@ export default async function DashboardPage() {
                     </p>
                   </div>
                   <span className="text-xs font-medium bg-green-100 text-green-700 rounded-full px-2.5 py-1">Open</span>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Past polls</h2>
+        {pastPolls.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-gray-400 text-sm">
+            No past polls yet.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {pastPolls.map((poll) => {
+              const winnerDate = poll.winner ? formatWinnerDate(poll.winner.dateValue, poll.winner.endDate) : null
+              return (
+                <Link
+                  key={poll.id}
+                  href={`/polls/${poll.id}`}
+                  className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-3 hover:border-indigo-300 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-900 truncate">{poll.title}</p>
+                    <p className="text-sm text-gray-500 mt-0.5 truncate">
+                      {poll.group ? poll.group.name + " · " : ""}
+                      {poll.winner ? `Winner: ${poll.winner.label}${winnerDate ? ` (${winnerDate})` : ""}` : "No winner"}
+                      {" · "}{formatDistanceToNow(poll.updatedAt)}
+                    </p>
+                  </div>
+                  <span className={`text-xs font-medium rounded-full px-2.5 py-1 ml-3 ${
+                    poll.status === "CLOSED" ? "bg-gray-100 text-gray-600" : "bg-red-50 text-red-600"
+                  }`}>{poll.status === "CLOSED" ? "Closed" : "Cancelled"}</span>
                 </Link>
               )
             })}
