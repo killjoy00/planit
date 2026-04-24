@@ -2,7 +2,7 @@
 
 import { signIn } from "next-auth/react"
 import { useSearchParams } from "next/navigation"
-import { useState, useActionState, Suspense } from "react"
+import { useState, Suspense } from "react"
 
 function LoginForm() {
   const params = useSearchParams()
@@ -10,14 +10,25 @@ function LoginForm() {
   const [email, setEmail] = useState("")
   const [sent, setSent] = useState(false)
   const [pending, setPending] = useState(false)
+  const [error, setError] = useState("")
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!email) return
     setPending(true)
-    await signIn("resend", { email, redirect: false })
-    setSent(true)
-    setPending(false)
+    setError("")
+    try {
+      const result = await signIn("resend", { email, redirect: false })
+      if (result?.error) {
+        setError(`Sign-in failed: ${result.error}. Please try again.`)
+      } else {
+        setSent(true)
+      }
+    } catch (err: any) {
+      setError(err?.message ?? "Something went wrong. Please try again.")
+    } finally {
+      setPending(false)
+    }
   }
 
   if (verified || sent) {
@@ -47,6 +58,9 @@ function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
         />
+        {error && (
+          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+        )}
         <button
           type="submit"
           disabled={pending}
