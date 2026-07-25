@@ -24,7 +24,7 @@ export default async function VoteDonePage({ params }: { params: Promise<{ token
   const total = poll.participants.filter((p) => !p.optedOut).length
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-12">
+    <main className="flex-1 bg-gray-50 px-4 py-12">
       <div className="max-w-md mx-auto space-y-6 text-center">
         <div className="text-5xl">🎉</div>
         <h1 className="text-2xl font-bold text-gray-900">Vote received!</h1>

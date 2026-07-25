@@ -7,7 +7,7 @@ export default async function HomePage() {
   if (session?.user) redirect("/dashboard")
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-4 text-center">
+    <main className="flex flex-1 flex-col items-center justify-center px-4 text-center">
       <div className="max-w-lg">
         <h1 className="text-5xl font-bold tracking-tight text-gray-900">planit</h1>
         <p className="mt-4 text-xl text-gray-600">

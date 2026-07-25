@@ -13,7 +13,7 @@ export default async function OptedOutPage({ params }: { params: Promise<{ token
   if (!participant) notFound()
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex flex-1 items-center justify-center px-4">
       <div className="max-w-sm w-full text-center space-y-4">
         {participant.optedOut ? (
           <>

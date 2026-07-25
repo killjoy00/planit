@@ -23,7 +23,7 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
   if (participant.votedAt) redirect(`/vote/${token}/done`)
   if (participant.poll.status !== "OPEN") {
     return (
-      <main className="flex min-h-screen items-center justify-center px-4">
+      <main className="flex flex-1 items-center justify-center px-4">
         <div className="max-w-sm w-full text-center space-y-2">
           <p className="text-2xl">🔒</p>
           <h1 className="text-xl font-bold text-gray-900">This poll is closed</h1>
@@ -37,7 +37,7 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
   const total = participant.poll.participants.filter((p) => !p.optedOut).length
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-8">
+    <main className="flex-1 bg-gray-50 px-4 py-8">
       <div className="max-w-md mx-auto space-y-6">
         <div>
           <p className="text-sm text-gray-500">
