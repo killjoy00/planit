@@ -27,6 +27,12 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      {/* React hoists async scripts into <head> and dedupes them across the tree */}
+      <script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1217971050094766"
+        crossOrigin="anonymous"
+      />
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
