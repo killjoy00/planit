@@ -7,7 +7,9 @@ export function SiteFooter() {
         <p className="text-sm text-gray-400">
           © {new Date().getFullYear()} planit
         </p>
-        <nav className="flex items-center gap-5 text-sm">
+        <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm">
+          <Link href="/guides" className="text-gray-500 hover:text-indigo-600">Guides</Link>
+          <Link href="/faq" className="text-gray-500 hover:text-indigo-600">FAQ</Link>
           <Link href="/about" className="text-gray-500 hover:text-indigo-600">About</Link>
           <Link href="/privacy" className="text-gray-500 hover:text-indigo-600">Privacy</Link>
           <Link href="/terms" className="text-gray-500 hover:text-indigo-600">Terms</Link>

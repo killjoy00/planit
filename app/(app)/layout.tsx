@@ -1,7 +1,16 @@
+import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { SignOutButton } from "@/components/ui/SignOutButton"
+
+/**
+ * Everything behind sign-in is the product, not published content: it is kept
+ * out of the index, and the AdSense tag is never loaded here.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()

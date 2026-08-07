@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/*
+ * The UI is light-themed throughout (hardcoded gray-900 text on white cards).
+ * A prefers-color-scheme override used to flip only the body background, which
+ * left dark-mode visitors reading near-black text on a near-black page, so the
+ * palette is pinned to light here instead.
+ */
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,15 +18,102 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Long-form article body. Tailwind v4 without the typography plugin, so the
+   element defaults for published prose are set once, here. */
+.article {
+  color: var(--color-gray-700);
+  line-height: 1.75;
+}
+
+.article > * + * {
+  margin-top: 1.25rem;
+}
+
+.article h2 {
+  margin-top: 2.75rem;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--color-gray-900);
+}
+
+.article h3 {
+  margin-top: 2rem;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+
+.article strong {
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+
+.article a {
+  color: var(--color-indigo-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.article a:hover {
+  color: var(--color-indigo-700);
+}
+
+.article ul,
+.article ol {
+  padding-left: 1.5rem;
+}
+
+.article ul {
+  list-style: disc;
+}
+
+.article ol {
+  list-style: decimal;
+}
+
+.article li + li {
+  margin-top: 0.5rem;
+}
+
+.article li::marker {
+  color: var(--color-gray-400);
+}
+
+.article blockquote {
+  border-left: 3px solid var(--color-indigo-200);
+  padding-left: 1rem;
+  font-style: italic;
+  color: var(--color-gray-600);
+}
+
+.article table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.article th,
+.article td {
+  border-bottom: 1px solid var(--color-gray-200);
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.article th {
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+
+.article hr {
+  border-color: var(--color-gray-200);
 }

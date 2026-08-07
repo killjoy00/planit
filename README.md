@@ -1,5 +1,31 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Route groups and where ads may appear
+
+The `app/` directory is split into four groups, and the split is load-bearing for
+AdSense policy compliance — Google-served ads are not permitted on screens without
+publisher content (sign-in, app chrome, alerts, confirmations).
+
+| Group        | Routes                                    | AdSense tag | Indexed |
+| ------------ | ----------------------------------------- | ----------- | ------- |
+| `(content)`  | `/`, `/guides/*`, `/faq`, `/about`        | yes         | yes     |
+| `(legal)`    | `/privacy`, `/terms`                      | no          | yes     |
+| `(auth)`     | `/login`                                  | no          | no      |
+| `(app)`      | `/dashboard`, `/groups/*`, `/polls/*`     | no          | no      |
+| `vote/`      | `/vote/[token]/*`                         | no          | no      |
+
+The tag is loaded by `AdSenseScript` in `app/(content)/layout.tsx` and nowhere else.
+Do not move it to the root layout. `noindex` lives in each group's layout metadata;
+`app/robots.ts` blocks only `/api/` and `/vote/`, so the `noindex` on the remaining
+private routes stays readable by crawlers.
+
+Guide metadata lives in `lib/guides.ts` (index page, sitemap, per-page `<title>`);
+each guide's prose lives in its own route file. Adding a guide means an entry in the
+registry plus a `app/(content)/guides/<slug>/page.tsx`.
+
+Optional env var: `NEXT_PUBLIC_ADSENSE_ARTICLE_SLOT` renders an explicit in-article
+unit below each guide. Leave it unset to rely on Auto ads.
+
 ## Getting Started
 
 First, run the development server:
