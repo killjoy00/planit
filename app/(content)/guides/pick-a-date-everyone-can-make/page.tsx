@@ -56,7 +56,7 @@ export default function Page() {
         </li>
         <li>
           <strong>Multiple selection.</strong> People tick every option that works, not their
-          favourite. This is the single highest-leverage change you can make, and the next section
+          favorite. This is the single highest-leverage change you can make, and the next section
           explains why.
         </li>
         <li>
@@ -78,7 +78,7 @@ export default function Page() {
 
       <h2>Let people tick more than one</h2>
       <p>
-        If everyone picks a single favourite night out of four, the votes scatter. Six people and
+        If everyone picks a single favorite night out of four, the votes scatter. Six people and
         four options gives you a winner with two or three votes, which means half the group has an
         objection you never wrote down. Worse, the losing options might have been fine for
         everybody &mdash; they just were not anyone&rsquo;s first choice.
@@ -107,7 +107,7 @@ export default function Page() {
       <ul>
         <li>
           <strong>Across weeks, not days.</strong> Three consecutive Thursdays beats Tuesday,
-          Wednesday, and Thursday of the same week &mdash; whoever is travelling that week is out
+          Wednesday, and Thursday of the same week &mdash; whoever is traveling that week is out
           of all three.
         </li>
         <li>
@@ -125,7 +125,7 @@ export default function Page() {
 
       <h2>Set the closing rule before you send</h2>
       <p>
-        The most common reason a poll stays open forever is that the organiser never decided what
+        The most common reason a poll stays open forever is that the organizer never decided what
         &ldquo;enough&rdquo; means. Decide it in advance and put it in the invitation. Two rules
         cover almost every case:
       </p>
@@ -179,7 +179,7 @@ export default function Page() {
       <h2>The short version</h2>
       <ol>
         <li>Offer three to five specific date-and-time options, spread across different weeks.</li>
-        <li>Let people tick every option that works, not just their favourite.</li>
+        <li>Let people tick every option that works, not just their favorite.</li>
         <li>Give them a visible way to say no.</li>
         <li>State the deadline and what happens when it passes.</li>
         <li>Close on schedule, announce the count, and do not reopen.</li>

@@ -5,7 +5,7 @@ import { formatDate, guidesByDate } from "@/lib/guides"
 export const metadata: Metadata = {
   title: "Guides to group planning, scheduling, and decisions",
   description:
-    "Practical, opinionated guides on organising groups: picking dates people can actually make, writing polls that get answered, choosing a voting method, and following up without nagging.",
+    "Practical, opinionated guides on organizing groups: picking dates people can actually make, writing polls that get answered, choosing a voting method, and following up without nagging.",
   alternates: { canonical: "/guides" },
 }
 
@@ -18,7 +18,7 @@ export default function GuidesIndexPage() {
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Guides</h1>
         <div className="article mt-6">
           <p>
-            Organising anything for more than four people is a skill, and almost nobody is taught
+            Organizing anything for more than four people is a skill, and almost nobody is taught
             it. These are the things we keep learning the hard way while building planit: how to
             ask a question a group can actually answer, why a chat thread cannot close a decision,
             what a deadline needs in order to work, and how to chase people without becoming the

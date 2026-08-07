@@ -20,7 +20,7 @@ export default function Page() {
     <Article slug={SLUG}>
       <p>
         Most groups never choose a voting method. They inherit one &mdash; usually
-        &ldquo;everybody name your favourite, most names wins&rdquo; &mdash; and then argue about
+        &ldquo;everybody name your favorite, most names wins&rdquo; &mdash; and then argue about
         the result without noticing that the counting rule, not the group, produced it.
       </p>
       <p>
@@ -52,7 +52,7 @@ export default function Page() {
         Nobody is being strategic and nobody is lying. Now watch what the counting does.
       </p>
 
-      <h2>Plurality: everyone names one favourite</h2>
+      <h2>Plurality: everyone names one favorite</h2>
       <p>
         Count first choices only. Ramen gets Ana, Ben, and Cara &mdash; three. Tapas gets Dev and
         Eve &mdash; two. Curry gets Finn and Gia &mdash; two. Pizza gets Hal &mdash; one.
@@ -70,7 +70,7 @@ export default function Page() {
       </p>
       <p>
         Plurality is fine when there are exactly two options, or when you expect a genuine
-        favourite to be obvious. With four options and eight people it is close to a coin flip
+        favorite to be obvious. With four options and eight people it is close to a coin flip
         dressed up as a decision.
       </p>
 
@@ -112,7 +112,7 @@ export default function Page() {
         </tbody>
       </table>
       <p>
-        <strong>Pizza wins with seven of eight.</strong> It was almost nobody&rsquo;s favourite
+        <strong>Pizza wins with seven of eight.</strong> It was almost nobody&rsquo;s favorite
         &mdash; only Hal put it first &mdash; and it is the option nearly everyone is content with.
       </p>
       <p>
@@ -120,7 +120,7 @@ export default function Page() {
         from a group decision. Its weakness is the mirror image: it cannot tell the difference
         between &ldquo;I would love this&rdquo; and &ldquo;fine, I suppose&rdquo;, so an option
         that everyone mildly tolerates can beat one that half the group would be genuinely excited
-        about. It is also mildly gameable &mdash; someone who ticks only their favourite gets more
+        about. It is also mildly gameable &mdash; someone who ticks only their favorite gets more
         leverage than someone who ticks three &mdash; though in a group of friends who can see each
         other next week, that tends to sort itself out.
       </p>
@@ -178,7 +178,7 @@ export default function Page() {
       <h2>Constraints are not votes</h2>
       <p>
         One thing no counting method handles: hard constraints. If someone cannot eat at the sushi
-        place, or genuinely cannot afford the £200 option, that is not a preference to be outvoted.
+        place, or genuinely cannot afford the $250 option, that is not a preference to be outvoted.
         It is a filter to apply before the ballot exists.
       </p>
       <p>
@@ -196,7 +196,7 @@ export default function Page() {
         </li>
         <li>
           <strong>Choosing between a handful of acceptable options</strong> &mdash; restaurant,
-          film, activity: approval again, optionally with a &ldquo;first choice&rdquo; marker to
+          movie, activity: approval again, optionally with a &ldquo;first choice&rdquo; marker to
           break ties by enthusiasm.
         </li>
         <li>
@@ -223,7 +223,7 @@ export default function Page() {
       <p>
         One last thing worth keeping in proportion: turnout beats method. A well-chosen rule
         applied to four responses out of nine is worse than plurality applied to all nine. Get
-        everyone to answer first; optimise the counting second.
+        everyone to answer first; optimize the counting second.
       </p>
     </Article>
   )

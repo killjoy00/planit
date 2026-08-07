@@ -33,7 +33,7 @@ const USES = [
   ["Dinner on a weeknight", "Four dates, one question, closes Thursday."],
   ["A weekend away", "Find the window six people can all make before anyone books anything."],
   ["A recurring club night", "Same group every month; a new poll takes about twenty seconds."],
-  ["A birthday nobody has organised yet", "Including the part where you find out who is actually coming."],
+  ["A birthday nobody has organized yet", "Including the part where you find out who is actually coming."],
 ]
 
 export default async function HomePage() {
@@ -98,7 +98,7 @@ export default async function HomePage() {
             <p>Three design decisions do most of the work of fixing that:</p>
             <ul>
               <li>
-                <strong>Groups persist.</strong> The reason people stop organising is not the
+                <strong>Groups persist.</strong> The reason people stop organizing is not the
                 deciding, it is the admin. Rebuilding the same list of eight email addresses every
                 time is enough friction to kill a monthly thing.
               </li>

@@ -8,7 +8,7 @@ export default function Page() {
   return (
     <Article slug={SLUG}>
       <p>
-        Chasing responses is the part of organising that makes people stop organising. It is not
+        Chasing responses is the part of organizing that makes people stop organizing. It is not
         the work &mdash; the work is ten minutes. It is the feeling of standing in a group chat
         asking eight adults, for the third time, whether they are coming to dinner.
       </p>
@@ -21,7 +21,7 @@ export default function Page() {
       <h2>Start from the right assumption</h2>
       <p>
         The overwhelming majority of non-responses are not refusals. They are people who read your
-        message on a phone, in a queue, intending to answer properly later, and then later
+        message on a phone, standing in line somewhere, intending to answer properly later, and then later
         happened. Almost nobody is deliberately ignoring you, and the small number who are
         genuinely ambivalent are usually staying quiet because saying no felt awkward &mdash; which
         is a problem you can fix directly.
@@ -181,7 +181,7 @@ export default function Page() {
       <p>
         Worth saying, because most of us are on both sides of this. The polite instinct &mdash;
         wait until I can answer properly &mdash; is the one that causes the damage. A fifteen-second
-        approximate answer today is far more useful to whoever is organising than a considered one
+        approximate answer today is far more useful to whoever is organizing than a considered one
         next week, and an immediate &ldquo;count me out&rdquo; is a genuine kindness. The only
         genuinely rude reply is the one that never arrives.
       </p>

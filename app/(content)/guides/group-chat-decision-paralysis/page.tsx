@@ -29,7 +29,7 @@ export default function Page() {
         does not need me specifically.
       </p>
       <p>
-        Because the organiser cannot distinguish between them, they do the only safe thing and
+        Because the organizer cannot distinguish between them, they do the only safe thing and
         wait. And waiting is exactly wrong for three of the four cases. Most stalled plans are not
         waiting on a decision; they are waiting on a signal that will never arrive because the
         person who owed it does not know they owe it.
@@ -45,7 +45,7 @@ export default function Page() {
       <p>
         This is why chat threads produce so many stale agreements &mdash; someone says
         &ldquo;yes!&rdquo; to a plan that has since mutated, and their yes gets counted for a
-        version of the evening they never actually agreed to. The organiser ends up holding a pile
+        version of the evening they never actually agreed to. The organizer ends up holding a pile
         of approvals for slightly different plans and no way to add them up.
       </p>
 
@@ -57,7 +57,7 @@ export default function Page() {
       </p>
       <p>
         Deciding by exhaustion has a cost people underrate. The person who ends up booking is
-        usually the same person every time, and the reason they eventually stop organising things
+        usually the same person every time, and the reason they eventually stop organizing things
         is not that the plans were bad. It is that closing a decision in a chat requires being
         slightly annoying in public, repeatedly, and nobody wants that role permanently.
       </p>
@@ -67,7 +67,7 @@ export default function Page() {
         A message to twelve people is a message to nobody. This is the bystander effect in its most
         ordinary form: the larger the group, the lower each individual&rsquo;s sense that the reply
         has to come from them specifically. Response rates fall as group size rises, and they fall
-        faster than most organisers expect &mdash; the same question that gets four replies out of
+        faster than most organizers expect &mdash; the same question that gets four replies out of
         five in a group of five gets six out of fifteen in a group of fifteen.
       </p>
       <p>

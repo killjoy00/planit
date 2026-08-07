@@ -21,7 +21,7 @@ export default function Page() {
       <h2>Ask exactly one question</h2>
       <p>
         The most common mistake is stacking. <em>&ldquo;Which weekend works, and do we want the
-        cabin or the coast, and is everyone okay with about £200 each?&rdquo;</em> That is three
+        cabin or the coast, and is everyone okay with about $250 each?&rdquo;</em> That is three
         decisions, and they interact &mdash; the answer to the money question changes the answer to
         the destination question. Anyone who thinks carefully about it cannot answer at all, so they
         wait until they have time to reply properly, and that time never comes.
@@ -52,11 +52,11 @@ export default function Page() {
         </li>
         <li>
           <strong>No overlaps.</strong> If two options can both be true at once, votes split
-          arbitrarily between them and the winner is an artefact of your wording.
+          arbitrarily between them and the winner is an artifact of your wording.
         </li>
         <li>
           <strong>Carry the deciding detail inline.</strong> If price, travel time, or dress code
-          is going to matter, put it in the option: &ldquo;Sushi place on 5th &mdash; about £40
+          is going to matter, put it in the option: &ldquo;Sushi place on 5th &mdash; about $50
           each&rdquo;. Otherwise people vote for a thing they have not actually evaluated, and you
           get the objection after you have booked.
         </li>
@@ -74,14 +74,14 @@ export default function Page() {
       </p>
       <p>
         Order matters more than people expect: the first and last options in a list get a small but
-        real boost. If you care about the result being clean, do not put your own favourite at the
+        real boost. If you care about the result being clean, do not put your own favorite at the
         top.
       </p>
 
       <h2>Word it neutrally, then get out of the way</h2>
       <p>
         <em>&ldquo;Option 3 is the good one obviously 😄&rdquo;</em> reads as friendly and functions
-        as a thumb on the scale. Once the organiser has signalled a preference, voting against it
+        as a thumb on the scale. Once the organizer has signalled a preference, voting against it
         costs something socially, and quiet people stop being a useful signal.
       </p>
       <p>
@@ -165,7 +165,7 @@ export default function Page() {
         the decision, and they are welcome to come to whatever the group picks.
       </p>
 
-      <h2>Honour the result</h2>
+      <h2>Honor the result</h2>
       <p>
         The last piece of poll design happens after the poll. If you run a vote and then override
         it, or reopen it because one person who never voted turns out to be busy, you have taught
@@ -174,7 +174,7 @@ export default function Page() {
       <p>
         Announce the outcome with the numbers, thank the people who answered, and go book it. If the
         result is genuinely unworkable &mdash; the winning night turns out to be impossible for the
-        person whose flat you are using &mdash; say exactly that, explain the constraint you missed,
+        person whose apartment you are using &mdash; say exactly that, explain the constraint you missed,
         and run a fresh vote. What people accept is a stated reason. What they punish is a decision
         that quietly ignores their answer.
       </p>

@@ -81,7 +81,7 @@ const FAQS: { section: string; items: Faq[] }[] = [
           <p>
             Up to three, escalating in directness, and then they stop. Anyone who has voted or
             opted out is dropped from the reminder list immediately. Reminders that repeat
-            themselves forever are what make organising feel like nagging, so the sequence is
+            themselves forever are what make organizing feel like nagging, so the sequence is
             deliberately finite.{" "}
             <Link href="/guides/follow-up-without-nagging">
               How to write a follow-up that works
@@ -134,12 +134,12 @@ const FAQS: { section: string; items: Faq[] }[] = [
         a: (
           <p>
             Results show the standings once you have voted, so people can see how the group is
-            leaning without that information shaping their own answer beforehand. The organiser sees
+            leaning without that information shaping their own answer beforehand. The organizer sees
             who has and has not responded, which is what makes a targeted reminder possible.
           </p>
         ),
         text:
-          "Standings are shown after you vote, so early answers do not anchor later ones. The organiser can see who has and has not responded.",
+          "Standings are shown after you vote, so early answers do not anchor later ones. The organizer can see who has and has not responded.",
       },
     ],
   },

@@ -78,13 +78,13 @@ export default function Page() {
       <ul>
         <li>
           <strong>Quote an all-in per-person figure, not a nightly rate.</strong> &ldquo;Roughly
-          £450 each including flights, accommodation and getting around, plus your own food and
+          $600 each including flights, accommodation and getting around, plus your own food and
           drink.&rdquo; A per-night number hides two thirds of the real cost, and the hiding is
           what produces the late dropouts.
         </li>
         <li>
           <strong>Offer bands rather than a single number.</strong> Ask people to pick a ceiling
-          &mdash; under £300, £300 to £500, £500 to £800 &mdash; rather than asking &ldquo;is this
+          &mdash; under $400, $400 to $700, $700 to $1,000 &mdash; rather than asking &ldquo;is this
           okay?&rdquo;, which almost everybody answers yes to. The band that keeps the most people
           in is your budget.
         </li>
@@ -108,9 +108,9 @@ export default function Page() {
         approval vote: tick everywhere you would be happy to go.
       </p>
       <p>
-        Approval rather than favourites matters here. First-choice voting on four destinations in a
+        Approval rather than favorites matters here. First-choice voting on four destinations in a
         group of eight produces a winner with three votes and five people who feel overruled about
-        a trip they are about to spend several hundred pounds on.
+        a trip they are about to spend several hundred dollars on.
       </p>
 
       <h2>Seven weeks out: the deposit &mdash; where &ldquo;in&rdquo; becomes real</h2>
@@ -142,8 +142,8 @@ export default function Page() {
       </p>
       <p>
         Then split the ownership. One person cannot hold an eight-person trip in their head without
-        becoming resentful, and the most reliable predictor of a badly organised trip is a single
-        organiser who never delegated. Four named roles cover almost everything:
+        becoming resentful, and the most reliable predictor of a badly organized trip is a single
+        organizer who never delegated. Four named roles cover almost everything:
       </p>
       <ul>
         <li>
@@ -192,7 +192,7 @@ export default function Page() {
       </p>
       <p>
         Settle money once, after the trip, from a single shared record &mdash; not continuously
-        over five days. Running reconciliation is the fastest way to make a holiday feel like
+        over five days. Running reconciliation is the fastest way to make a vacation feel like
         admin.
       </p>
 
