@@ -3,8 +3,9 @@ import Link from "next/link"
 import { Prose, Section } from "@/components/ui/Prose"
 
 export const metadata: Metadata = {
-  title: "Terms of Service — planit",
+  title: "Terms of Service",
   description: "The terms you agree to when using planit.",
+  alternates: { canonical: "/terms" },
 }
 
 const CONTACT = "support@planitnow.us"

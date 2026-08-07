@@ -2,8 +2,9 @@ import type { Metadata } from "next"
 import { Prose, Section } from "@/components/ui/Prose"
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — planit",
+  title: "Privacy Policy",
   description: "What planit collects, why, who it is shared with, and how to have it deleted.",
+  alternates: { canonical: "/privacy" },
 }
 
 const CONTACT = "privacy@planitnow.us"
@@ -86,11 +87,17 @@ export default function PrivacyPage() {
           service. Voting by email sets no such cookie.
         </p>
         <p>
-          The second comes from advertising. We use Google AdSense to display ads.
-          Third-party vendors, including Google, use cookies to serve ads based on your
-          prior visits to this and other websites. Google&apos;s use of advertising
-          cookies enables it and its partners to serve ads to you based on your visits to
-          our site and other sites on the internet.
+          The second comes from advertising. We use Google AdSense to display ads, and only
+          on our published pages — the home page, the guides, the FAQ, and this site&apos;s
+          other articles. No ads are shown inside the signed-in app, on voting or
+          confirmation screens, or in any email we send, so the AdSense script does not load
+          at all on those pages.
+        </p>
+        <p>
+          Where ads are shown, third-party vendors including Google use cookies to serve ads
+          based on your prior visits to this and other websites. Google&apos;s use of
+          advertising cookies enables it and its partners to serve ads to you based on your
+          visits to our site and other sites on the internet.
         </p>
         <p>
           You can opt out of personalised advertising in{" "}

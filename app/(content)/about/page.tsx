@@ -3,8 +3,9 @@ import Link from "next/link"
 import { Prose, Section } from "@/components/ui/Prose"
 
 export const metadata: Metadata = {
-  title: "About — planit",
-  description: "Why planit exists and how group voting by email works.",
+  title: "About",
+  description: "Why planit exists, how group voting by email works, and who builds it.",
+  alternates: { canonical: "/about" },
 }
 
 export default function AboutPage() {
@@ -53,10 +54,37 @@ export default function AboutPage() {
         </p>
       </Section>
 
+      <Section heading="What we write about">
+        <p>
+          Building this has meant thinking rather more than expected about how groups actually
+          make decisions — why a chat thread cannot close one, how many options a poll should
+          offer, what a deadline needs in order to be believed, and how to chase people without
+          becoming insufferable. We write that up in the{" "}
+          <Link href="/guides" className="text-indigo-600 hover:underline font-medium">
+            guides
+          </Link>
+          . None of it requires planit; most of it is just how to ask a group a question they
+          can answer.
+        </p>
+      </Section>
+
       <Section heading="What it costs">
         <p>
-          Nothing. planit is free to use. The site runs ads to cover its hosting and
-          email costs.
+          Nothing. planit is free to use, with no paid tier and no card required. Hosting and
+          email are paid for by advertising shown alongside the guides and other published pages
+          on this site. You will not see an ad inside the app, on a voting screen, or in any
+          email planit sends you.
+        </p>
+      </Section>
+
+      <Section heading="Who makes it">
+        <p>
+          planit is an independent project, not a company — built and maintained by a very small
+          team who got tired of watching plans die in group chats. Feedback and bug reports go to{" "}
+          <a href="mailto:support@planitnow.us" className="text-indigo-600 hover:underline">
+            support@planitnow.us
+          </a>
+          , and a human reads them.
         </p>
       </Section>
 
