@@ -14,7 +14,14 @@ export interface Guide {
   published: string
   updated?: string
   minutes: number
-  topic: "Scheduling" | "Group decisions" | "Etiquette" | "Trips"
+  topic:
+    | "Scheduling"
+    | "Group decisions"
+    | "Etiquette"
+    | "Trips"
+    | "Money"
+    | "Events"
+    | "Recurring groups"
 }
 
 export const guides: Guide[] = [
@@ -83,6 +90,94 @@ export const guides: Guide[] = [
     published: "2026-08-04",
     minutes: 12,
     topic: "Trips",
+  },
+  {
+    slug: "splitting-the-bill",
+    title: "Splitting the bill without anyone quietly resenting it",
+    description:
+      "Even split or itemized, who fronts the money, when to settle, and how to handle the person who orders the lobster. The mechanics of group money.",
+    excerpt:
+      "Money is the thing groups are worst at discussing and quickest to resent. Most of the damage comes from three decisions nobody makes out loud — how to split, who fronts, and when to settle.",
+    published: "2026-08-22",
+    minutes: 10,
+    topic: "Money",
+  },
+  {
+    slug: "group-size-changes-everything",
+    title: "Why five, eight, and twelve are completely different problems",
+    description:
+      "Coordination cost does not rise with group size, it accelerates. What breaks at each threshold, and what to change when your group crosses one.",
+    excerpt:
+      "The methods that work beautifully for five people fall apart at twelve, and not gradually. Group size has thresholds, each with its own failure mode and its own fix.",
+    published: "2026-08-22",
+    minutes: 10,
+    topic: "Group decisions",
+  },
+  {
+    slug: "scheduling-across-time-zones",
+    title: "Scheduling a group across time zones",
+    description:
+      "The fairness math, the notation that prevents disasters, and why the meeting nobody wants at 6am keeps getting scheduled at 6am.",
+    excerpt:
+      "Distributed groups do not have a scheduling problem, they have a fairness problem wearing a scheduling problem as a disguise. Here is how to run it so the same person is not always the one getting up early.",
+    published: "2026-08-22",
+    minutes: 9,
+    topic: "Scheduling",
+  },
+  {
+    slug: "breaking-a-deadlock",
+    title: "What to do when the group genuinely cannot agree",
+    description:
+      "Five ways out of a stalemate — relaxing constraints, splitting the group, rotating the decider, and when a coin flip is the legitimate answer.",
+    excerpt:
+      "Sometimes the vote is tied, or every option is blocked by someone. Deadlock is not a failure of the group; it is a signal that the question is wrong. Five ways out, in the order to try them.",
+    published: "2026-08-22",
+    minutes: 9,
+    topic: "Group decisions",
+  },
+  {
+    slug: "planning-a-group-dinner",
+    title: "How to plan a group dinner that actually happens",
+    description:
+      "Table size, reservations, dietary constraints, and price signaling — the specific things that sink restaurant plans for six or more.",
+    excerpt:
+      "Restaurant plans fail in ways that trips do not: the table you can book shapes the guest list, and the price nobody mentioned shapes who shows up.",
+    published: "2026-08-22",
+    minutes: 9,
+    topic: "Events",
+  },
+  {
+    slug: "keeping-a-recurring-group-alive",
+    title: "How to keep a book club, game night, or supper club alive",
+    description:
+      "Recurring groups die from drift, not from conflict. Fixed cadence, an attendance floor, rotating ownership, and the honest exit.",
+    excerpt:
+      "Almost every recurring group dies the same way: one skipped month, then a rescheduled one, then a thread nobody answers. The fixes are structural and they are boring, which is why they work.",
+    published: "2026-08-22",
+    minutes: 10,
+    topic: "Recurring groups",
+  },
+  {
+    slug: "planning-someone-elses-birthday",
+    title: "Organizing a birthday for someone who is not organizing it",
+    description:
+      "The guest list problem, surprise logistics, gift coordination, and how to plan around a person without them noticing or being left out.",
+    excerpt:
+      "Planning for someone else inverts every normal rule: you cannot ask the one person who knows the answers, and the guest list is a minefield you did not draw.",
+    published: "2026-08-22",
+    minutes: 9,
+    topic: "Events",
+  },
+  {
+    slug: "the-etiquette-of-dropping-out",
+    title: "The etiquette of dropping out",
+    description:
+      "When cancelling is fine, how much notice you owe, what you owe financially, and how to say it in a way that costs the group nothing.",
+    excerpt:
+      "Everyone eventually has to pull out of something they said yes to. What separates a forgivable cancellation from a memorable one is almost entirely timing and phrasing.",
+    published: "2026-08-22",
+    minutes: 8,
+    topic: "Etiquette",
   },
 ]
 
