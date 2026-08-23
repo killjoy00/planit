@@ -4,9 +4,25 @@ import { signIn } from "next-auth/react"
 import { useSearchParams } from "next/navigation"
 import { useState, Suspense } from "react"
 
+/**
+ * Auth.js redirects its failures here (`pages.error` in `auth.config.ts`).
+ * `Verification` is the common one: a magic link that expired or was already
+ * spent, arriving from the callback rather than the confirmation page.
+ */
+const AUTH_ERRORS: Record<string, string> = {
+  Verification:
+    "That sign-in link is no longer valid — it either expired or was already used. Enter your email and we'll send a fresh one.",
+  AccessDenied: "That address isn't allowed to sign in.",
+  Configuration: "Sign-in is temporarily unavailable. Please try again in a moment.",
+}
+
 function LoginForm() {
   const params = useSearchParams()
   const verified = params.get("verify") === "1"
+  const errorCode = params.get("error")
+  const linkError = errorCode
+    ? (AUTH_ERRORS[errorCode] ?? "Something went wrong signing you in. Please try again.")
+    : ""
   const [email, setEmail] = useState("")
   const [sent, setSent] = useState(false)
   const [pending, setPending] = useState(false)
@@ -49,6 +65,9 @@ function LoginForm() {
     <div>
       <h2 className="text-2xl font-bold text-gray-900 text-center">Sign in to planit</h2>
       <p className="mt-2 text-center text-gray-500 text-sm">We&apos;ll email you a magic link. No password.</p>
+      {linkError && (
+        <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{linkError}</p>
+      )}
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <input
           type="email"
