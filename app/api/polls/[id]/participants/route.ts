@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendInviteEmail } from "@/lib/email"
+import { creatorDisplayName } from "@/lib/display-name"
 
 const schema = z.object({
   invitees: z.array(z.object({
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   )
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-  const creatorName = poll.creator.name ?? poll.creator.email ?? "Someone"
+  const creatorName = creatorDisplayName(poll.creator)
 
   function formatDateRange(start: Date | null, end: Date | null): string | undefined {
     if (!start) return undefined

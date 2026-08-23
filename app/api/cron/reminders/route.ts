@@ -2,6 +2,7 @@ import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { verifyCronSecret } from "@/lib/cron-auth"
 import { sendReminderEmail } from "@/lib/email"
+import { creatorDisplayName } from "@/lib/display-name"
 
 const HOURS = 60 * 60 * 1000
 
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     const voted = poll.participants.filter((p) => p.votedAt && !p.optedOut).length
     const total = poll.participants.filter((p) => !p.optedOut).length
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-    const creatorName = poll.creator.name ?? poll.creator.email ?? "Someone"
+    const creatorName = creatorDisplayName(poll.creator)
     const pendingNames = unvoted.map((p) => p.name)
 
     let sent = 0

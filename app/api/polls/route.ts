@@ -3,10 +3,13 @@ import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendInviteEmail } from "@/lib/email"
+import { MAX_DISPLAY_NAME, creatorDisplayName, normalizeDisplayName } from "@/lib/display-name"
 
 const inviteeSchema = z.object({ name: z.string().min(1), email: z.string().email() })
 
 const schema = z.object({
+  /** How the creator wants to be named in the invitation. Saved for next time. */
+  creatorName: z.string().max(MAX_DISPLAY_NAME).optional(),
   title: z.string().min(1).max(200),
   description: z.string().optional(),
   type: z.enum(["DATE_POLL", "SINGLE_CHOICE", "YES_NO_VETO"]),
@@ -31,6 +34,16 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const { title, description, type, options, groupId, invitees, deadline, threshold, allowSuggestions } = parsed.data
+
+  // Remember the sender's name on the account, so later polls and the reminder
+  // cron address people the same way without asking again.
+  const displayName = normalizeDisplayName(parsed.data.creatorName)
+  if (displayName) {
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { name: displayName },
+    })
+  }
 
   const poll = await db.poll.create({
     data: {
@@ -62,7 +75,7 @@ export async function POST(req: NextRequest) {
   })
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-  const creatorName = poll.creator.name ?? poll.creator.email ?? "Someone"
+  const creatorName = creatorDisplayName(poll.creator)
 
   function formatDateRange(start: Date | null, end: Date | null): string | undefined {
     if (!start) return undefined
