@@ -46,7 +46,17 @@ export function PollWizard({ groups }: Props) {
   function addOption() { setOptions((o) => [...o, { label: "", dateValue: "", endDate: "" }]) }
   function removeOption(i: number) { setOptions((o) => o.filter((_, idx) => idx !== i)) }
   function updateOption(i: number, field: keyof Option, val: string) {
-    setOptions((o) => o.map((opt, idx) => idx === i ? { ...opt, [field]: val } : opt))
+    setOptions((o) => o.map((opt, idx) => {
+      if (idx !== i) return opt
+      if (field === "dateValue" && val) {
+        // Anchor the end-date field to the start date so its calendar picker
+        // opens there instead of on today, and keep it valid if the start
+        // date moves past a previously chosen end date.
+        const endDate = !opt.endDate || opt.endDate < val ? val : opt.endDate
+        return { ...opt, dateValue: val, endDate }
+      }
+      return { ...opt, [field]: val }
+    }))
   }
 
   function addExtra() { setExtraInvitees((e) => [...e, { name: "", email: "" }]) }
