@@ -1,21 +1,29 @@
 import type { Poll, PollOption, Participant, Vote } from "@/app/generated/prisma/client"
 import { VoteChoice } from "@/app/generated/prisma/enums"
 
-type PollWithRelations = Poll & {
+type PollForWinner = Pick<Poll, "type"> & {
   options: PollOption[]
-  participants: (Participant & { vote: Vote | null })[]
   votes: Vote[]
 }
 
+/**
+ * Whether one participant may select several options at once.
+ *
+ * A date poll asks "when are you free?", and the honest answer is usually more
+ * than one date — so every date that works is a selection of its own. The other
+ * types ask for a single decision.
+ */
+export function isMultiSelect(type: Poll["type"]): boolean {
+  return type === "DATE_POLL"
+}
+
 export function getUnvotedParticipants(
-  participants: (Participant & { vote: Vote | null })[]
+  participants: Pick<Participant, "votedAt" | "optedOut">[]
 ) {
   return participants.filter((p) => !p.votedAt && !p.optedOut)
 }
 
-export function determineWinner(
-  poll: PollWithRelations
-): PollOption | null {
+export function determineWinner(poll: PollForWinner): PollOption | null {
   const { options, votes, type } = poll
 
   if (type === "YES_NO_VETO") {
@@ -28,20 +36,23 @@ export function determineWinner(
     return null
   }
 
-  // For DATE_POLL and SINGLE_CHOICE: option with most votes wins
+  // DATE_POLL and SINGLE_CHOICE: the option with the most votes wins. On a date
+  // poll each vote row is one person marking themselves available for that
+  // date, so this reads as "the date the most people can make". Ties go to the
+  // earliest option by `order`.
   const counts = new Map<string, number>()
   for (const option of options) {
     counts.set(option.id, 0)
   }
   for (const vote of votes) {
-    if (vote.optionId) {
+    if (vote.optionId && counts.has(vote.optionId)) {
       counts.set(vote.optionId, (counts.get(vote.optionId) ?? 0) + 1)
     }
   }
 
   let winnerOption: PollOption | null = null
   let maxVotes = 0
-  for (const option of options.sort((a, b) => a.order - b.order)) {
+  for (const option of [...options].sort((a, b) => a.order - b.order)) {
     const count = counts.get(option.id) ?? 0
     if (count > maxVotes) {
       maxVotes = count
@@ -52,7 +63,7 @@ export function determineWinner(
 }
 
 export function checkThreshold(
-  poll: Poll,
+  poll: Pick<Poll, "type" | "threshold">,
   votes: Vote[]
 ): boolean {
   if (!poll.threshold) return false
@@ -60,7 +71,9 @@ export function checkThreshold(
     const yesCount = votes.filter((v) => v.choice === VoteChoice.YES).length
     return yesCount >= poll.threshold
   }
-  // For choice polls: any option reaching threshold
+  // Choice polls: any option reaching the threshold. A participant contributes
+  // at most one vote per option, so on a date poll this still means "N people
+  // are available for that date", not "N selections were made".
   const counts = new Map<string, number>()
   for (const vote of votes) {
     if (vote.optionId) {

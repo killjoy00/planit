@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     where: { status: "OPEN", deadline: { lte: now } },
     include: {
       options: true,
-      participants: { include: { vote: true } },
+      participants: true,
       votes: true,
     },
   })

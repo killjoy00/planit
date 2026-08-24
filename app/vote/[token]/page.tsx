@@ -1,6 +1,7 @@
 import { db } from "@/lib/db"
 import { notFound, redirect } from "next/navigation"
 import { VotingForm } from "@/components/vote/VotingForm"
+import { isMultiSelect } from "@/lib/poll-logic"
 
 export default async function VotePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -62,6 +63,7 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
           participantName={participant.name}
           optOutUrl={`/vote/${token}/opted-out`}
           allowSuggestions={participant.poll.allowSuggestions}
+          multiSelect={isMultiSelect(participant.poll.type)}
         />
       </div>
     </main>
