@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { determineWinner } from "@/lib/poll-logic"
-import { sendWinnerEmail } from "@/lib/email"
+import { sendWinnerEmails } from "@/lib/email"
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -36,20 +36,24 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const resultsUrl = `${appUrl}/polls/${id}`
     const icsUrl = winner.dateValue ? `${appUrl}/api/polls/ics/${id}` : undefined
 
-    await Promise.allSettled(
+    const delivery = await sendWinnerEmails(
       poll.participants
         .filter((p) => !p.optedOut)
-        .map((p) =>
-          sendWinnerEmail({
-            participantName: p.name,
-            participantEmail: p.email,
-            pollTitle: poll.title,
-            winnerLabel: winner.label,
-            resultsUrl,
-            icsUrl,
-          })
-        )
+        .map((p) => ({
+          participantName: p.name,
+          participantEmail: p.email,
+          pollTitle: poll.title,
+          winnerLabel: winner.label,
+          resultsUrl,
+          icsUrl,
+        }))
     )
+    if (delivery.failed.length > 0) {
+      console.error(
+        `[winner] poll ${id}: result refused for ${delivery.failed.length} participants`,
+        delivery.failed,
+      )
+    }
   }
 
   return NextResponse.json({ ok: true, winnerId: winner?.id ?? null })

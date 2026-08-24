@@ -1,7 +1,7 @@
 import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { verifyCronSecret } from "@/lib/cron-auth"
-import { sendReminderEmail } from "@/lib/email"
+import { sendReminderEmails } from "@/lib/email"
 import { creatorDisplayName } from "@/lib/display-name"
 
 const HOURS = 60 * 60 * 1000
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     },
   })
 
-  const results: { pollId: string; level: number; sent: number }[] = []
+  const results: { pollId: string; level: number; sent: number; failed: number }[] = []
 
   for (const poll of openPolls) {
     const ageMs = now.getTime() - poll.createdAt.getTime()
@@ -36,30 +36,44 @@ export async function GET(req: NextRequest) {
     const creatorName = creatorDisplayName(poll.creator)
     const pendingNames = unvoted.map((p) => p.name)
 
-    let sent = 0
-    for (const p of unvoted) {
-      try {
-        await sendReminderEmail(nextLevel, {
-          participantName: p.name,
-          participantEmail: p.email,
-          creatorName,
-          pollTitle: poll.title,
-          voteUrl: `${appUrl}/vote/${p.token}`,
-          optOutUrl: `${appUrl}/vote/${p.token}/opted-out`,
-          votedCount: voted,
-          totalCount: total,
-          pendingNames,
-        })
-        sent++
-      } catch { /* continue sending to others */ }
+    const delivery = await sendReminderEmails(
+      nextLevel,
+      unvoted.map((p) => ({
+        participantName: p.name,
+        participantEmail: p.email,
+        creatorName,
+        pollTitle: poll.title,
+        voteUrl: `${appUrl}/vote/${p.token}`,
+        optOutUrl: `${appUrl}/vote/${p.token}/opted-out`,
+        votedCount: voted,
+        totalCount: total,
+        pendingNames,
+      })),
+    )
+
+    if (delivery.failed.length > 0) {
+      console.error(
+        `[reminders] poll ${poll.id}: level ${nextLevel} refused for ${delivery.failed.length} of ${unvoted.length}`,
+        delivery.failed,
+      )
     }
 
-    await db.poll.update({
-      where: { id: poll.id },
-      data: { reminderLevel: nextLevel, lastReminderAt: now },
-    })
+    // Advance the level only once something actually went out. Bumping it on a
+    // send the provider refused outright would burn the reminder — nobody was
+    // reminded, and this level never comes round again.
+    if (delivery.sent.length > 0) {
+      await db.poll.update({
+        where: { id: poll.id },
+        data: { reminderLevel: nextLevel, lastReminderAt: now },
+      })
+    }
 
-    results.push({ pollId: poll.id, level: nextLevel, sent })
+    results.push({
+      pollId: poll.id,
+      level: nextLevel,
+      sent: delivery.sent.length,
+      failed: delivery.failed.length,
+    })
   }
 
   return NextResponse.json({ processed: results.length, results })

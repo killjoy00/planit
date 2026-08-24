@@ -2,8 +2,8 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { sendInviteEmail } from "@/lib/email"
-import { MAX_DISPLAY_NAME, creatorDisplayName, normalizeDisplayName } from "@/lib/display-name"
+import { deliverInvites, normalizeInvitees } from "@/lib/invites"
+import { MAX_DISPLAY_NAME, normalizeDisplayName } from "@/lib/display-name"
 
 const inviteeSchema = z.object({ name: z.string().min(1), email: z.string().email() })
 
@@ -35,6 +35,13 @@ export async function POST(req: NextRequest) {
 
   const { title, description, type, options, groupId, invitees, deadline, threshold, allowSuggestions } = parsed.data
 
+  // A group's members and the hand-typed extras overlap all the time, and two
+  // rows for one address is a unique-constraint failure on the whole create.
+  const recipients = normalizeInvitees(invitees)
+  if (recipients.length === 0) {
+    return NextResponse.json({ error: "Add at least one invitee." }, { status: 400 })
+  }
+
   // Remember the sender's name on the account, so later polls and the reminder
   // cron address people the same way without asking again.
   const displayName = normalizeDisplayName(parsed.data.creatorName)
@@ -64,7 +71,7 @@ export async function POST(req: NextRequest) {
         })),
       },
       participants: {
-        create: invitees.map((inv) => ({ name: inv.name, email: inv.email })),
+        create: recipients.map((inv) => ({ name: inv.name, email: inv.email })),
       },
     },
     include: {
@@ -74,34 +81,10 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-  const creatorName = creatorDisplayName(poll.creator)
+  const delivery = await deliverInvites(poll, poll.participants)
 
-  function formatDateRange(start: Date | null, end: Date | null): string | undefined {
-    if (!start) return undefined
-    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    if (!end) return start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
-    return `${fmt(start)} – ${fmt(end)}, ${end.getFullYear()}`
-  }
-
-  await Promise.allSettled(
-    poll.participants.map((p) =>
-      sendInviteEmail({
-        participantName: p.name,
-        participantEmail: p.email,
-        creatorName,
-        pollTitle: poll.title,
-        pollDescription: poll.description ?? undefined,
-        pollType: poll.type,
-        voteUrl: `${appUrl}/vote/${p.token}`,
-        deadline: poll.deadline ?? undefined,
-        options: poll.options.map((o) => ({
-          label: o.label,
-          dateStr: formatDateRange(o.dateValue, o.endDate),
-        })),
-      })
-    )
+  return NextResponse.json(
+    { id: poll.id, invitesSent: delivery.sent.length, invitesFailed: delivery.failed.length },
+    { status: 201 },
   )
-
-  return NextResponse.json({ id: poll.id }, { status: 201 })
 }

@@ -2,7 +2,7 @@ import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { verifyCronSecret } from "@/lib/cron-auth"
 import { determineWinner } from "@/lib/poll-logic"
-import { sendWinnerEmail } from "@/lib/email"
+import { sendWinnerEmails } from "@/lib/email"
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -27,20 +27,24 @@ export async function GET(req: NextRequest) {
 
     if (winner) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-      await Promise.allSettled(
+      const delivery = await sendWinnerEmails(
         poll.participants
           .filter((p) => !p.optedOut)
-          .map((p) =>
-            sendWinnerEmail({
-              participantName: p.name,
-              participantEmail: p.email,
-              pollTitle: poll.title,
-              winnerLabel: winner.label,
-              resultsUrl: `${appUrl}/polls/${poll.id}`,
-              icsUrl: winner.dateValue ? `${appUrl}/api/polls/ics/${poll.id}` : undefined,
-            })
-          )
+          .map((p) => ({
+            participantName: p.name,
+            participantEmail: p.email,
+            pollTitle: poll.title,
+            winnerLabel: winner.label,
+            resultsUrl: `${appUrl}/polls/${poll.id}`,
+            icsUrl: winner.dateValue ? `${appUrl}/api/polls/ics/${poll.id}` : undefined,
+          }))
       )
+      if (delivery.failed.length > 0) {
+        console.error(
+          `[auto-close] poll ${poll.id}: result refused for ${delivery.failed.length} participants`,
+          delivery.failed,
+        )
+      }
     }
     closed++
   }

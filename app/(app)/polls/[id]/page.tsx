@@ -53,6 +53,7 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
           participants: poll.participants.map((p) => ({
             id: p.id, name: p.name, email: p.email,
             voted: !!p.votedAt, optedOut: p.optedOut,
+            inviteDelivered: !!p.inviteSentAt,
             vote: p.vote ? { optionId: p.vote.optionId ?? null, choice: p.vote.choice ?? null } : null,
           })),
         }}

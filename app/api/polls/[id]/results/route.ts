@@ -28,6 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     participants: poll.participants.map((p) => ({
       id: p.id, name: p.name, email: p.email,
       voted: !!p.votedAt, optedOut: p.optedOut,
+      inviteDelivered: !!p.inviteSentAt,
       vote: p.vote ? { optionId: p.vote.optionId, choice: p.vote.choice } : null,
     })),
   })
