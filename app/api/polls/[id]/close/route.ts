@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { creatorDisplayName } from "@/lib/display-name"
 import { NextRequest, NextResponse } from "next/server"
 import { determineWinner } from "@/lib/poll-logic"
 import { sendWinnerEmails } from "@/lib/email"
@@ -15,6 +16,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       options: true,
       participants: true,
       votes: true,
+      creator: { select: { name: true, email: true } },
     },
   })
 
@@ -42,10 +44,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         .map((p) => ({
           participantName: p.name,
           participantEmail: p.email,
+          creatorName: creatorDisplayName(poll.creator),
           pollTitle: poll.title,
           winnerLabel: winner.label,
           resultsUrl,
           icsUrl,
+          unsubscribeUrl: `${appUrl}/api/unsubscribe/${p.token}`,
+          replyTo: poll.replyToCreator ? poll.creator.email ?? undefined : undefined,
         }))
     )
     if (delivery.failed.length > 0) {

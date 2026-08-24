@@ -10,6 +10,7 @@ export default function WinnerEmail({
   winnerLabel,
   resultsUrl,
   icsUrl,
+  unsubscribeUrl,
 }: WinnerEmailProps) {
   const firstName = participantName.split(" ")[0]
   return (
@@ -40,7 +41,7 @@ export default function WinnerEmail({
           <a href={icsUrl} style={{ color: "#4f46e5" }}>Add to calendar (.ics)</a>
         </Text>
       )}
-      <Footer />
+      <Footer unsubscribeUrl={unsubscribeUrl} />
     </Layout>
   )
 }

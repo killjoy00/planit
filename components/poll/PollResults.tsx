@@ -78,11 +78,14 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
         setResendNote(typeof body.error === "string" ? body.error : "Could not resend.")
         return
       }
-      setResendNote(
-        body.failed.length > 0
-          ? `Sent ${body.sent}. Still undelivered: ${body.failed.length}.`
-          : `Sent ${body.sent} invitation${body.sent === 1 ? "" : "s"}.`,
-      )
+      const notes = [`Sent ${body.sent} invitation${body.sent === 1 ? "" : "s"}.`]
+      if (body.failed.length > 0) notes.push(`Still undelivered: ${body.failed.length}.`)
+      if (body.unsubscribed > 0) {
+        notes.push(
+          `${body.unsubscribed} unsubscribed from planit and will not be emailed again.`,
+        )
+      }
+      setResendNote(notes.join(" "))
       await refresh()
     } catch {
       setResendNote("Something went wrong.")

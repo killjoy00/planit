@@ -1,4 +1,5 @@
 import { db } from "@/lib/db"
+import { creatorDisplayName } from "@/lib/display-name"
 import { NextRequest, NextResponse } from "next/server"
 import { verifyCronSecret } from "@/lib/cron-auth"
 import { determineWinner } from "@/lib/poll-logic"
@@ -14,6 +15,7 @@ export async function GET(req: NextRequest) {
       options: true,
       participants: true,
       votes: true,
+      creator: { select: { name: true, email: true } },
     },
   })
 
@@ -33,10 +35,13 @@ export async function GET(req: NextRequest) {
           .map((p) => ({
             participantName: p.name,
             participantEmail: p.email,
+            creatorName: creatorDisplayName(poll.creator),
             pollTitle: poll.title,
             winnerLabel: winner.label,
             resultsUrl: `${appUrl}/polls/${poll.id}`,
             icsUrl: winner.dateValue ? `${appUrl}/api/polls/ics/${poll.id}` : undefined,
+            unsubscribeUrl: `${appUrl}/api/unsubscribe/${p.token}`,
+            replyTo: poll.replyToCreator ? poll.creator.email ?? undefined : undefined,
           }))
       )
       if (delivery.failed.length > 0) {

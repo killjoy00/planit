@@ -12,6 +12,7 @@ export default function InviteEmail({
   voteUrl,
   deadline,
   options,
+  unsubscribeUrl,
 }: InviteEmailProps) {
   const firstName = participantName.split(" ")[0]
   return (
@@ -51,7 +52,7 @@ export default function InviteEmail({
           <> Voting closes {deadline.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}.</>
         )}
       </Text>
-      <Footer optOutUrl={`${voteUrl}/opted-out`} />
+      <Footer optOutUrl={`${voteUrl}/opted-out`} unsubscribeUrl={unsubscribeUrl} />
     </Layout>
   )
 }

@@ -10,6 +10,7 @@ export default function Reminder3Email({
   pollTitle,
   voteUrl,
   optOutUrl,
+  unsubscribeUrl,
   pendingNames = [],
 }: ReminderEmailProps) {
   const firstName = participantName.split(" ")[0]
@@ -38,7 +39,7 @@ export default function Reminder3Email({
         {waitingLine} If you don&apos;t vote, the group will move forward without you.
       </Text>
       <Button href={voteUrl}>Vote now</Button>
-      <Footer optOutUrl={optOutUrl} />
+      <Footer optOutUrl={optOutUrl} unsubscribeUrl={unsubscribeUrl} />
     </Layout>
   )
 }

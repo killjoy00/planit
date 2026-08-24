@@ -35,6 +35,7 @@ interface InvitePoll {
   description: string | null
   type: string
   deadline: Date | null
+  replyToCreator: boolean
   options: Array<{ label: string; dateValue: Date | null; endDate: Date | null }>
   creator: { name: string | null; email: string | null }
 }
@@ -63,6 +64,8 @@ function inviteProps(poll: InvitePoll, participants: InviteParticipant[]): Invit
     dateStr: formatDateRange(o.dateValue, o.endDate),
   }))
 
+  const replyTo = poll.replyToCreator ? poll.creator.email ?? undefined : undefined
+
   return participants.map((p) => ({
     participantName: p.name,
     participantEmail: p.email,
@@ -73,6 +76,8 @@ function inviteProps(poll: InvitePoll, participants: InviteParticipant[]): Invit
     voteUrl: `${appUrl}/vote/${p.token}`,
     deadline: poll.deadline ?? undefined,
     options,
+    unsubscribeUrl: `${appUrl}/api/unsubscribe/${p.token}`,
+    replyTo,
   }))
 }
 
@@ -98,6 +103,15 @@ async function recordDelivery(pollId: string, result: DeliveryResult): Promise<v
         data: { inviteSentAt: null, inviteError: f.reason.slice(0, 500) },
       }),
     ),
+    // Not a failure and not something to retry — they asked us to stop.
+    ...(result.suppressed.length > 0
+      ? [
+          db.participant.updateMany({
+            where: { pollId, email: { in: result.suppressed } },
+            data: { inviteSentAt: null, inviteError: "Unsubscribed from planit email", optedOut: true },
+          }),
+        ]
+      : []),
   ])
 }
 
@@ -106,7 +120,7 @@ export async function deliverInvites(
   poll: InvitePoll,
   participants: InviteParticipant[],
 ): Promise<DeliveryResult> {
-  if (participants.length === 0) return { sent: [], failed: [] }
+  if (participants.length === 0) return { sent: [], failed: [], suppressed: [] }
 
   const result = await sendInviteEmails(inviteProps(poll, participants))
   await recordDelivery(poll.id, result)
