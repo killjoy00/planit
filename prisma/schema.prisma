@@ -100,6 +100,10 @@ model Poll {
   deadline          DateTime?
   threshold         Int?
   allowSuggestions  Boolean       @default(false)
+  /// Put the creator's address in Reply-To, so invitees can answer a person
+  /// rather than a no-reply mailbox. Off unless the creator asks for it — it
+  /// shows their address to everyone on the guest list.
+  replyToCreator    Boolean       @default(false)
   reminderLevel     Int           @default(0)
   lastReminderAt DateTime?
   winnerId       String?
@@ -183,4 +187,20 @@ enum VoteChoice {
   YES
   FINE
   NO
+}
+
+// ── Suppression ──────────────────────────────────────────────────────────────
+
+/// Addresses that must never be mailed again, however they got here.
+///
+/// Distinct from `Participant.optedOut`, which means "count me out of this one
+/// plan" and still lets a friend invite you to the next. This is the mail
+/// client's One-Click unsubscribe and it is global and permanent: honouring it
+/// exactly is what keeps complaint rates — and therefore inbox placement — low.
+model EmailSuppression {
+  id        String   @id @default(cuid())
+  /// Always stored lowercased; compare case-insensitively.
+  email     String   @unique
+  reason    String?
+  createdAt DateTime @default(now())
 }

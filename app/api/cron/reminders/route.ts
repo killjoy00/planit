@@ -45,6 +45,8 @@ export async function GET(req: NextRequest) {
         pollTitle: poll.title,
         voteUrl: `${appUrl}/vote/${p.token}`,
         optOutUrl: `${appUrl}/vote/${p.token}/opted-out`,
+        unsubscribeUrl: `${appUrl}/api/unsubscribe/${p.token}`,
+        replyTo: poll.replyToCreator ? poll.creator.email ?? undefined : undefined,
         votedCount: voted,
         totalCount: total,
         pendingNames,

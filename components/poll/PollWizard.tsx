@@ -42,6 +42,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
   const [deadline, setDeadline] = useState("")
   const [threshold, setThreshold] = useState("")
   const [allowSuggestions, setAllowSuggestions] = useState(false)
+  const [replyToCreator, setReplyToCreator] = useState(false)
 
   const selectedGroup = groups.find((g) => g.id === groupId)
   const groupMembers: Invitee[] = selectedGroup?.members ?? []
@@ -109,6 +110,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
       deadline: deadline ? new Date(deadline).toISOString() : undefined,
       threshold: threshold ? parseInt(threshold) : undefined,
       allowSuggestions,
+      replyToCreator,
     }
 
     startTransition(async () => {
@@ -339,6 +341,26 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
               allowSuggestions ? "border-indigo-500 bg-indigo-500" : "border-gray-300"
             }`}>
               {allowSuggestions && <span className="text-white text-xs font-bold">✓</span>}
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setReplyToCreator((v) => !v)}
+            className={`w-full flex items-center justify-between rounded-xl border-2 px-4 py-3 transition-all ${
+              replyToCreator ? "border-indigo-500 bg-indigo-50" : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            <div className="text-left">
+              <p className="text-sm font-medium text-gray-900">Let people reply to me directly</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Replies go to your email instead of nowhere. Invitees will see your address — and mail
+                people can answer is far less likely to land in spam.
+              </p>
+            </div>
+            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
+              replyToCreator ? "border-indigo-500 bg-indigo-500" : "border-gray-300"
+            }`}>
+              {replyToCreator && <span className="text-white text-xs font-bold">✓</span>}
             </div>
           </button>
         </div>

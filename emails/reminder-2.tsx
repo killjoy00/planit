@@ -10,6 +10,7 @@ export default function Reminder2Email({
   pollTitle,
   voteUrl,
   optOutUrl,
+  unsubscribeUrl,
   votedCount,
   totalCount,
 }: ReminderEmailProps) {
@@ -28,7 +29,7 @@ export default function Reminder2Email({
         <strong>{creatorName}</strong> can&apos;t finalize the plan until everyone weighs in.
       </Text>
       <Button href={voteUrl}>Vote now — takes 10 seconds</Button>
-      <Footer optOutUrl={optOutUrl} />
+      <Footer optOutUrl={optOutUrl} unsubscribeUrl={unsubscribeUrl} />
     </Layout>
   )
 }

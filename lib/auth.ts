@@ -38,6 +38,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           render(email, { plainText: true }),
         ])
 
+        // Deliberately not routed through `sendBulk`, so the suppression list
+        // does not apply: this is a link the reader just asked for by typing
+        // their address into the sign-in form, not mail we decided to send.
+        //
         // `emails.send` resolves with `{ data: null, error }` instead of
         // throwing, so awaiting it alone would report a refused sign-in link as
         // a sent one and leave the reader watching an empty inbox. Auth.js

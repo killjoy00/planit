@@ -23,6 +23,7 @@ const schema = z.object({
   deadline: z.string().datetime().optional(),
   threshold: z.number().int().positive().optional(),
   allowSuggestions: z.boolean().optional(),
+  replyToCreator: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
-  const { title, description, type, options, groupId, invitees, deadline, threshold, allowSuggestions } = parsed.data
+  const { title, description, type, options, groupId, invitees, deadline, threshold, allowSuggestions, replyToCreator } = parsed.data
 
   // A group's members and the hand-typed extras overlap all the time, and two
   // rows for one address is a unique-constraint failure on the whole create.
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
       deadline: deadline ? new Date(deadline) : null,
       threshold: threshold ?? null,
       allowSuggestions: allowSuggestions ?? false,
+      replyToCreator: replyToCreator ?? false,
       options: {
         create: options.map((opt, i) => ({
           label: opt.label,

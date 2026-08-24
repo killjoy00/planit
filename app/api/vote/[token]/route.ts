@@ -1,4 +1,5 @@
 import { db } from "@/lib/db"
+import { creatorDisplayName } from "@/lib/display-name"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { checkThreshold, determineWinner, isMultiSelect } from "@/lib/poll-logic"
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   if (shouldAutoClose) {
     const fullPoll = await db.poll.findUnique({
       where: { id: participant.pollId },
-      include: { options: true, participants: true, votes: true },
+      include: { options: true, participants: true, votes: true, creator: { select: { name: true, email: true } }, },
     })
     if (fullPoll && fullPoll.status === "OPEN") {
       const winner = determineWinner(fullPoll)
@@ -108,10 +109,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
             .map((p) => ({
               participantName: p.name,
               participantEmail: p.email,
+              creatorName: creatorDisplayName(fullPoll.creator),
               pollTitle: fullPoll.title,
               winnerLabel: winner.label,
               resultsUrl: `${appUrl}/polls/${fullPoll.id}`,
               icsUrl: winner.dateValue ? `${appUrl}/api/polls/ics/${fullPoll.id}` : undefined,
+              unsubscribeUrl: `${appUrl}/api/unsubscribe/${p.token}`,
+              replyTo: fullPoll.replyToCreator ? fullPoll.creator.email ?? undefined : undefined,
             }))
         )
         if (delivery.failed.length > 0) {

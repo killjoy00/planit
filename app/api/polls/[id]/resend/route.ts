@@ -39,5 +39,6 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({
     sent: delivery.sent.length,
     failed: delivery.failed.map((f) => ({ email: f.email, reason: f.reason })),
+    unsubscribed: delivery.suppressed.length,
   })
 }
