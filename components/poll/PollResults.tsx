@@ -3,7 +3,13 @@
 import { useState, useEffect, useCallback, useTransition } from "react"
 
 interface Option { id: string; label: string; dateValue: string | null; endDate: string | null; suggestedByName: string | null; voteCount: number }
-interface Participant { id: string; name: string; email: string; voted: boolean; optedOut: boolean; inviteDelivered: boolean; vote: { optionId: string | null; choice: string | null } | null }
+interface Participant {
+  id: string; name: string; email: string
+  voted: boolean; optedOut: boolean; inviteDelivered: boolean
+  /** Every option this person picked. Date polls allow more than one. */
+  optionIds: string[]
+  choice: string | null
+}
 interface Winner { id: string; label: string; dateValue: string | null; endDate: string | null }
 
 interface ResultsData {
@@ -32,11 +38,14 @@ function formatDateRange(start: string | null, end: string | null): string | nul
   return `${fmt(s)} – ${fmt(e)}, ${e.getFullYear()}`
 }
 
-// Hydrate vote counts from participants
+// Hydrate vote counts from participants. One participant can contribute to
+// several options on a date poll, but only once to any single option.
 function hydrated(d: ResultsData): ResultsData {
   const counts = new Map<string, number>()
   for (const p of d.participants) {
-    if (p.vote?.optionId) counts.set(p.vote.optionId, (counts.get(p.vote.optionId) ?? 0) + 1)
+    for (const optionId of new Set(p.optionIds)) {
+      counts.set(optionId, (counts.get(optionId) ?? 0) + 1)
+    }
   }
   return { ...d, options: d.options.map((o) => ({ ...o, voteCount: counts.get(o.id) ?? 0 })) }
 }
@@ -198,7 +207,7 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
         ) : (
           <div className="flex gap-4">
             {["YES", "FINE", "NO"].map((c) => {
-              const count = h.participants.filter((p) => p.vote?.choice === c).length
+              const count = h.participants.filter((p) => p.choice === c).length
               return (
                 <div key={c} className="flex-1 text-center rounded-xl border border-gray-200 py-3">
                   <p className="text-2xl">{c === "YES" ? "✅" : c === "FINE" ? "🤷" : "❌"}</p>
@@ -275,16 +284,22 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
         )}
         <div className="space-y-1">
           {h.participants.map((p) => {
-            const votedOption = p.vote?.optionId ? h.options.find((o) => o.id === p.vote?.optionId) : null
+            const pickedLabels = p.optionIds
+              .map((id) => h.options.find((o) => o.id === id)?.label)
+              .filter((l): l is string => !!l)
+            const shown = pickedLabels.slice(0, 3)
+            const extra = pickedLabels.length - shown.length
             return (
-              <div key={p.id} className="flex items-center justify-between py-1.5 text-sm">
-                <div>
+              <div key={p.id} className="flex items-start justify-between gap-3 py-1.5 text-sm">
+                <div className="min-w-0">
                   <span className={`font-medium ${p.optedOut ? "text-gray-400 line-through" : "text-gray-800"}`}>{p.name}</span>
-                  {votedOption && pollType !== "YES_NO_VETO" && (
-                    <span className="ml-2 text-xs text-indigo-500">{votedOption.label}</span>
+                  {pickedLabels.length > 0 && pollType !== "YES_NO_VETO" && (
+                    <span className="ml-2 text-xs text-indigo-500">
+                      {shown.join(", ")}{extra > 0 && ` +${extra} more`}
+                    </span>
                   )}
                 </div>
-                <span className={`text-xs ${
+                <span className={`text-xs shrink-0 ${
                   p.optedOut ? "text-gray-400"
                     : p.voted ? "text-green-600"
                     : p.inviteDelivered ? "text-amber-500"

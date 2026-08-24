@@ -13,7 +13,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     where: { id },
     include: {
       options: true,
-      participants: { include: { vote: true } },
+      participants: true,
       votes: true,
     },
   })

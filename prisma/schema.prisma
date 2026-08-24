@@ -153,7 +153,7 @@ model Participant {
   // means it has not been attempted; `inviteError` set means it was refused.
   inviteSentAt DateTime?
   inviteError  String?   @db.Text
-  vote      Vote?
+  votes     Vote[]
   createdAt DateTime  @default(now())
 
   @@unique([pollId, email])
@@ -161,9 +161,13 @@ model Participant {
 
 // ── Votes ────────────────────────────────────────────────────────────────────
 
+/// One selection by one participant. A date poll records a row per date that
+/// works for that person, so a participant may hold several; single-choice and
+/// yes/no polls record exactly one. Uniqueness is per (participant, option)
+/// rather than per participant — the latter is what allowed only one pick.
 model Vote {
   id            String      @id @default(cuid())
-  participantId String      @unique
+  participantId String
   participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
   pollId        String
   poll          Poll        @relation(fields: [pollId], references: [id], onDelete: Cascade)
@@ -171,6 +175,8 @@ model Vote {
   option        PollOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
   choice        VoteChoice?
   createdAt     DateTime    @default(now())
+
+  @@unique([participantId, optionId])
 }
 
 enum VoteChoice {

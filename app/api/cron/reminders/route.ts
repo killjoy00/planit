@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     where: { status: "OPEN", reminderLevel: { lt: 3 } },
     include: {
       creator: { select: { name: true, email: true } },
-      participants: { include: { vote: true } },
+      participants: true,
     },
   })
 

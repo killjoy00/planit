@@ -17,17 +17,22 @@ interface Props {
   participantName: string
   optOutUrl: string
   allowSuggestions: boolean
+  /** Date polls: every option that works for this person, not just one. */
+  multiSelect: boolean
 }
 
-export function VotingForm({ token, pollType, options: initialOptions, participantName, optOutUrl, allowSuggestions }: Props) {
+export function VotingForm({ token, pollType, options: initialOptions, participantName, optOutUrl, allowSuggestions, multiSelect }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [options, setOptions] = useState(initialOptions)
-  const [selected, setSelected] = useState<string>("")
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [choice, setChoice] = useState<string>("")
   const [error, setError] = useState("")
   const [suggestion, setSuggestion] = useState("")
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [suggestionError, setSuggestionError] = useState("")
+
+  const firstName = participantName.split(" ")[0]
 
   function formatDateRange(start: string, end: string | null) {
     const s = new Date(start)
@@ -37,15 +42,27 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
     return `${fmt(s)} – ${fmt(e)}, ${e.getFullYear()}`
   }
 
+  function toggleOption(id: string) {
+    setError("")
+    setSelectedIds((prev) =>
+      multiSelect
+        ? prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        : [id],
+    )
+  }
+
   async function handleVote() {
-    if (!selected) return setError("Please make a selection.")
+    const body =
+      pollType === "YES_NO_VETO"
+        ? { choice }
+        : { optionIds: selectedIds }
+
+    if (pollType === "YES_NO_VETO" ? !choice : selectedIds.length === 0) {
+      return setError(multiSelect ? "Pick at least one date that works." : "Please make a selection.")
+    }
     setError("")
 
     startTransition(async () => {
-      const body = pollType === "YES_NO_VETO"
-        ? { choice: selected }
-        : { optionId: selected }
-
       const res = await fetch(`/api/vote/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,7 +71,7 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.error ?? "Something went wrong.")
+        setError(typeof data.error === "string" ? data.error : "Something went wrong.")
         return
       }
       router.push(`/vote/${token}/done`)
@@ -78,7 +95,8 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
       }
       const newOpt = await res.json()
       setOptions((prev) => [...prev, { id: newOpt.id, label: newOpt.label, dateValue: null, endDate: null }])
-      setSelected(newOpt.id)
+      // Someone who proposes an option is saying it works for them.
+      setSelectedIds((prev) => (multiSelect ? [...prev, newOpt.id] : [newOpt.id]))
       setSuggestion("")
     } catch {
       setSuggestionError("Something went wrong.")
@@ -90,7 +108,7 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
   if (pollType === "YES_NO_VETO") {
     return (
       <div className="space-y-4">
-        <p className="text-sm font-medium text-gray-700">Your answer, {participantName.split(" ")[0]}:</p>
+        <p className="text-sm font-medium text-gray-700">Your answer, {firstName}:</p>
         <div className="grid grid-cols-3 gap-3">
           {[
             { value: "YES", label: "Yes!", emoji: "✅" },
@@ -99,9 +117,9 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
           ].map((opt) => (
             <button
               key={opt.value}
-              onClick={() => setSelected(opt.value)}
+              onClick={() => { setChoice(opt.value); setError("") }}
               className={`rounded-xl border-2 py-4 text-center transition-all ${
-                selected === opt.value
+                choice === opt.value
                   ? "border-indigo-500 bg-indigo-50"
                   : "border-gray-200 bg-white hover:border-gray-300"
               }`}
@@ -114,7 +132,7 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           onClick={handleVote}
-          disabled={isPending || !selected}
+          disabled={isPending || !choice}
           className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors"
         >
           {isPending ? "Submitting…" : "Submit vote"}
@@ -128,25 +146,54 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
     )
   }
 
+  const count = selectedIds.length
+
   return (
     <div className="space-y-3">
-      <p className="text-sm font-medium text-gray-700">Pick one, {participantName.split(" ")[0]}:</p>
-      {options.map((opt) => (
-        <button
-          key={opt.id}
-          onClick={() => setSelected(opt.id)}
-          className={`w-full rounded-xl border-2 px-5 py-4 text-left transition-all ${
-            selected === opt.id
-              ? "border-indigo-500 bg-indigo-50"
-              : "border-gray-200 bg-white hover:border-gray-300"
-          }`}
-        >
-          <p className="font-medium text-gray-900">{opt.label}</p>
-          {opt.dateValue && (
-            <p className="text-sm text-gray-500 mt-0.5">{formatDateRange(opt.dateValue, opt.endDate)}</p>
-          )}
-        </button>
-      ))}
+      <div>
+        <p className="text-sm font-medium text-gray-700">
+          {multiSelect ? `Pick every date that works, ${firstName}:` : `Pick one, ${firstName}:`}
+        </p>
+        {multiSelect && (
+          <p className="text-sm text-gray-500 mt-0.5">
+            Select as many as you can make — the date that suits the most people wins.
+          </p>
+        )}
+      </div>
+      {options.map((opt) => {
+        const isSelected = selectedIds.includes(opt.id)
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            role={multiSelect ? "checkbox" : "radio"}
+            aria-checked={isSelected}
+            onClick={() => toggleOption(opt.id)}
+            className={`w-full rounded-xl border-2 px-5 py-4 text-left transition-all flex items-center gap-3 ${
+              isSelected
+                ? "border-indigo-500 bg-indigo-50"
+                : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            {multiSelect && (
+              <span
+                aria-hidden
+                className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-md border-2 text-xs font-bold text-white transition-colors ${
+                  isSelected ? "border-indigo-500 bg-indigo-500" : "border-gray-300 bg-white"
+                }`}
+              >
+                {isSelected ? "✓" : ""}
+              </span>
+            )}
+            <span className="min-w-0">
+              <span className="block font-medium text-gray-900">{opt.label}</span>
+              {opt.dateValue && (
+                <span className="block text-sm text-gray-500 mt-0.5">{formatDateRange(opt.dateValue, opt.endDate)}</span>
+              )}
+            </span>
+          </button>
+        )
+      })}
       {allowSuggestions && (
         <div className="rounded-xl border-2 border-dashed border-gray-200 px-4 py-3 space-y-2">
           <p className="text-sm font-medium text-gray-600">Don&apos;t see the right option? Suggest one:</p>
@@ -174,10 +221,14 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         onClick={handleVote}
-        disabled={isPending || !selected}
+        disabled={isPending || count === 0}
         className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors"
       >
-        {isPending ? "Submitting…" : "Submit vote"}
+        {isPending
+          ? "Submitting…"
+          : multiSelect && count > 0
+            ? `Submit ${count} date${count === 1 ? "" : "s"}`
+            : "Submit vote"}
       </button>
       <div className="text-center">
         <a href={optOutUrl} className="text-sm text-gray-400 hover:text-gray-600 underline">

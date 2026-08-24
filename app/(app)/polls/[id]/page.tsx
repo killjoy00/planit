@@ -13,7 +13,7 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
     where: { id },
     include: {
       options: { orderBy: { order: "asc" } },
-      participants: { include: { vote: true }, orderBy: { createdAt: "asc" } },
+      participants: { include: { votes: true }, orderBy: { createdAt: "asc" } },
       winner: true,
       group: { select: { name: true } },
     },
@@ -54,7 +54,8 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
             id: p.id, name: p.name, email: p.email,
             voted: !!p.votedAt, optedOut: p.optedOut,
             inviteDelivered: !!p.inviteSentAt,
-            vote: p.vote ? { optionId: p.vote.optionId ?? null, choice: p.vote.choice ?? null } : null,
+            optionIds: p.votes.map((v) => v.optionId).filter((id): id is string => !!id),
+            choice: p.votes.find((v) => v.choice)?.choice ?? null,
           })),
         }}
         pollType={poll.type}
