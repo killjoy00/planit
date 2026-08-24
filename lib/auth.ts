@@ -38,13 +38,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           render(email, { plainText: true }),
         ])
 
-        await resend.emails.send({
+        // `emails.send` resolves with `{ data: null, error }` instead of
+        // throwing, so awaiting it alone would report a refused sign-in link as
+        // a sent one and leave the reader watching an empty inbox. Auth.js
+        // surfaces a throw here as an error on the sign-in page.
+        const { error } = await resend.emails.send({
           from: FROM,
           to: identifier,
           subject: "One click and you're in — planit",
           html,
           text,
         })
+        if (error) throw new Error(`Could not send the sign-in link: ${error.message}`)
       },
     }),
   ],

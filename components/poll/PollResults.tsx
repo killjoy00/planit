@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useTransition } from "react"
+import { useState, useEffect, useCallback, useTransition } from "react"
 
 interface Option { id: string; label: string; dateValue: string | null; endDate: string | null; suggestedByName: string | null; voteCount: number }
-interface Participant { id: string; name: string; email: string; voted: boolean; optedOut: boolean; vote: { optionId: string | null; choice: string | null } | null }
+interface Participant { id: string; name: string; email: string; voted: boolean; optedOut: boolean; inviteDelivered: boolean; vote: { optionId: string | null; choice: string | null } | null }
 interface Winner { id: string; label: string; dateValue: string | null; endDate: string | null }
 
 interface ResultsData {
@@ -32,6 +32,15 @@ function formatDateRange(start: string | null, end: string | null): string | nul
   return `${fmt(s)} – ${fmt(e)}, ${e.getFullYear()}`
 }
 
+// Hydrate vote counts from participants
+function hydrated(d: ResultsData): ResultsData {
+  const counts = new Map<string, number>()
+  for (const p of d.participants) {
+    if (p.vote?.optionId) counts.set(p.vote.optionId, (counts.get(p.vote.optionId) ?? 0) + 1)
+  }
+  return { ...d, options: d.options.map((o) => ({ ...o, voteCount: counts.get(o.id) ?? 0 })) }
+}
+
 export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvailable: initialIcsAvailable, pollIdForIcs }: Props) {
   const [data, setData] = useState(initialData)
   const [isClosing, startClose] = useTransition()
@@ -41,6 +50,37 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
   const [isAdding, setIsAdding] = useState(false)
   const [addError, setAddError] = useState("")
   const [addSuccess, setAddSuccess] = useState("")
+  const [isResending, setIsResending] = useState(false)
+  const [resendNote, setResendNote] = useState("")
+
+  const refresh = useCallback(async () => {
+    const fresh = await fetch(`/api/polls/${pollId}/results`)
+    if (fresh.ok) setData(hydrated(await fresh.json()))
+  }, [pollId])
+
+  /** Retry the invitations the mail provider refused. */
+  async function handleResendInvites() {
+    setIsResending(true)
+    setResendNote("")
+    try {
+      const res = await fetch(`/api/polls/${pollId}/resend`, { method: "POST" })
+      const body = await res.json()
+      if (!res.ok) {
+        setResendNote(typeof body.error === "string" ? body.error : "Could not resend.")
+        return
+      }
+      setResendNote(
+        body.failed.length > 0
+          ? `Sent ${body.sent}. Still undelivered: ${body.failed.length}.`
+          : `Sent ${body.sent} invitation${body.sent === 1 ? "" : "s"}.`,
+      )
+      await refresh()
+    } catch {
+      setResendNote("Something went wrong.")
+    } finally {
+      setIsResending(false)
+    }
+  }
 
   async function handleAddInvite() {
     if (!newName.trim() || !newEmail.trim()) {
@@ -64,8 +104,7 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
       setAddSuccess(`Invite sent to ${newEmail.trim()}.`)
       setNewName("")
       setNewEmail("")
-      const fresh = await fetch(`/api/polls/${pollId}/results`)
-      if (fresh.ok) setData(hydrated(await fresh.json()))
+      await refresh()
     } catch {
       setAddError("Something went wrong.")
     } finally {
@@ -73,36 +112,22 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
     }
   }
 
-  // Hydrate vote counts from participants
-  function hydrated(d: ResultsData): ResultsData {
-    const counts = new Map<string, number>()
-    for (const p of d.participants) {
-      if (p.vote?.optionId) counts.set(p.vote.optionId, (counts.get(p.vote.optionId) ?? 0) + 1)
-    }
-    return { ...d, options: d.options.map((o) => ({ ...o, voteCount: counts.get(o.id) ?? 0 })) }
-  }
-
   useEffect(() => {
     if (data.status !== "OPEN") return
-    const iv = setInterval(async () => {
-      const res = await fetch(`/api/polls/${pollId}/results`)
-      if (res.ok) setData(hydrated(await res.json()))
-    }, 10000)
+    const iv = setInterval(refresh, 10000)
     return () => clearInterval(iv)
-  }, [pollId, data.status])
+  }, [refresh, data.status])
 
   const h = hydrated(data)
   const voted = h.participants.filter((p) => p.voted && !p.optedOut).length
   const total = h.participants.filter((p) => !p.optedOut).length
+  const undelivered = h.participants.filter((p) => !p.inviteDelivered && !p.optedOut)
   const maxVotes = Math.max(...h.options.map((o) => o.voteCount), 1)
 
   async function handleClose() {
     startClose(async () => {
       const res = await fetch(`/api/polls/${pollId}/close`, { method: "POST" })
-      if (res.ok) {
-        const fresh = await fetch(`/api/polls/${pollId}/results`)
-        if (fresh.ok) setData(hydrated(await fresh.json()))
-      }
+      if (res.ok) await refresh()
     })
   }
 
@@ -198,6 +223,27 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
             </button>
           )}
         </div>
+        {undelivered.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 mb-3 text-sm">
+            <p className="text-amber-800">
+              {undelivered.length === 1
+                ? "1 invitation never reached its recipient"
+                : `${undelivered.length} invitations never reached their recipients`}
+              : {undelivered.map((p) => p.email).join(", ")}. They cannot vote until
+              the invitation arrives — the vote link only travels by email.
+            </p>
+            {h.status === "OPEN" && (
+              <button
+                onClick={handleResendInvites}
+                disabled={isResending}
+                className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {isResending ? "Resending…" : "Resend invitations"}
+              </button>
+            )}
+            {resendNote && <p className="mt-2 text-xs text-amber-700">{resendNote}</p>}
+          </div>
+        )}
         {showAddInvite && h.status === "OPEN" && (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 mb-3 space-y-2">
             <div className="flex gap-2">
@@ -238,8 +284,16 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
                     <span className="ml-2 text-xs text-indigo-500">{votedOption.label}</span>
                   )}
                 </div>
-                <span className={`text-xs ${p.optedOut ? "text-gray-400" : p.voted ? "text-green-600" : "text-amber-500"}`}>
-                  {p.optedOut ? "Opted out" : p.voted ? "Voted" : "Pending"}
+                <span className={`text-xs ${
+                  p.optedOut ? "text-gray-400"
+                    : p.voted ? "text-green-600"
+                    : p.inviteDelivered ? "text-amber-500"
+                    : "text-red-600"
+                }`}>
+                  {p.optedOut ? "Opted out"
+                    : p.voted ? "Voted"
+                    : p.inviteDelivered ? "Pending"
+                    : "Not delivered"}
                 </span>
               </div>
             )

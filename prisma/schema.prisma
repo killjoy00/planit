@@ -149,6 +149,10 @@ model Participant {
   tokenUsed Boolean   @default(false)
   votedAt   DateTime?
   optedOut  Boolean   @default(false)
+  // Delivery of the invitation, as reported by the mail provider. Both null
+  // means it has not been attempted; `inviteError` set means it was refused.
+  inviteSentAt DateTime?
+  inviteError  String?   @db.Text
   vote      Vote?
   createdAt DateTime  @default(now())
 
