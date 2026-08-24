@@ -5,6 +5,7 @@ import Reminder1Email from "@/emails/reminder-1"
 import Reminder2Email from "@/emails/reminder-2"
 import Reminder3Email from "@/emails/reminder-3"
 import WinnerEmail from "@/emails/winner"
+import VerifyJoinEmail from "@/emails/verify-join"
 
 import { db } from "./db"
 
@@ -141,6 +142,14 @@ export interface WinnerEmailProps {
   unsubscribeUrl: string
   /** Creator's address, when the poll opted in to direct replies. */
   replyTo?: string
+}
+
+export interface JoinVerificationProps {
+  participantName: string
+  participantEmail: string
+  creatorName: string
+  pollTitle: string
+  verifyUrl: string
 }
 
 interface Message {
@@ -359,4 +368,35 @@ export async function sendWinnerEmails(props: WinnerEmailProps[]): Promise<Deliv
     ),
   )
   return sendBulk(messages)
+}
+
+/**
+ * Confirm an address that just asked to join a poll through a share link.
+ *
+ * Sent one at a time and deliberately outside `sendBulk`, so the suppression
+ * list does not apply — the same reasoning as the sign-in link. Someone who
+ * has typed their address into a join form is asking for this exact message;
+ * suppression governs mail we decide to send, not mail the reader requested.
+ * Anything that follows for this poll — reminders, the result — goes through
+ * `sendBulk` and is suppressed normally.
+ */
+export async function sendJoinVerification(props: JoinVerificationProps): Promise<DeliveryResult> {
+  const element = VerifyJoinEmail(props)
+  const [html, text] = await Promise.all([
+    render(element),
+    render(element, { plainText: true }),
+  ])
+
+  const { error } = await resend.emails.send({
+    from: senderFor(props.creatorName),
+    to: props.participantEmail,
+    subject: `Confirm your email to vote on ${props.pollTitle}`,
+    html,
+    text,
+  })
+
+  if (error) {
+    return { sent: [], failed: [{ email: props.participantEmail, reason: error.message }], suppressed: [] }
+  }
+  return { sent: [props.participantEmail], failed: [], suppressed: [] }
 }

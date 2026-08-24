@@ -97,6 +97,7 @@ model Poll {
   group          Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
   options        PollOption[]
   participants   Participant[]
+  joinRequests   JoinRequest[]
   deadline          DateTime?
   threshold         Int?
   allowSuggestions  Boolean       @default(false)
@@ -104,6 +105,12 @@ model Poll {
   /// rather than a no-reply mailbox. Off unless the creator asks for it — it
   /// shows their address to everyone on the guest list.
   replyToCreator    Boolean       @default(false)
+  /// One link the creator can hand out themselves — group chat, SMS, anywhere.
+  /// Null on polls created before share links existed; minted on first view.
+  /// Unlike a participant token this is public, so it grants nothing on its
+  /// own: it opens a join form, and a vote link is only issued to an address
+  /// that proved it can receive mail.
+  shareToken        String?       @unique @default(cuid())
   reminderLevel     Int           @default(0)
   lastReminderAt DateTime?
   winnerId       String?
@@ -187,6 +194,31 @@ enum VoteChoice {
   YES
   FINE
   NO
+}
+
+// ── Self-service joins ───────────────────────────────────────────────────────
+
+/// Someone who followed a share link and asked to join, but has not yet proved
+/// the address is theirs.
+///
+/// Deliberately not a `Participant` yet. The share link is public, so anyone
+/// who has it could otherwise pad a poll with addresses that never answer —
+/// inflating "3 of 12 voted" and earning the sender a pile of unsolicited mail.
+/// A row here becomes a participant only once its token comes back verified.
+model JoinRequest {
+  id        String   @id @default(cuid())
+  pollId    String
+  poll      Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  name      String
+  email     String
+  token     String   @unique @default(cuid())
+  expires   DateTime
+  /// When the verification mail last went out, so a refresh cannot be used to
+  /// mailbomb one address through a public form.
+  lastSentAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@unique([pollId, email])
 }
 
 // ── Suppression ──────────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
@@ -20,6 +21,14 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
   })
 
   if (!poll || poll.creatorId !== userId) notFound()
+
+  // Polls that predate share links have none; mint one the first time their
+  // creator looks, so every poll has a link to hand out.
+  let shareToken = poll.shareToken
+  if (!shareToken) {
+    shareToken = randomUUID()
+    await db.poll.update({ where: { id: poll.id }, data: { shareToken } })
+  }
 
   return (
     <div className="space-y-6">
@@ -62,6 +71,7 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
         pollTitle={poll.title}
         icsAvailable={!!poll.winner?.dateValue}
         pollIdForIcs={id}
+        shareUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/join/${shareToken}`}
       />
     </div>
   )

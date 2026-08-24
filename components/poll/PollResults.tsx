@@ -27,6 +27,8 @@ interface Props {
   pollTitle: string
   icsAvailable: boolean
   pollIdForIcs: string
+  /** Public link the creator can hand out themselves. */
+  shareUrl: string
 }
 
 function formatDateRange(start: string | null, end: string | null): string | null {
@@ -50,7 +52,7 @@ function hydrated(d: ResultsData): ResultsData {
   return { ...d, options: d.options.map((o) => ({ ...o, voteCount: counts.get(o.id) ?? 0 })) }
 }
 
-export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvailable: initialIcsAvailable, pollIdForIcs }: Props) {
+export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvailable: initialIcsAvailable, pollIdForIcs, shareUrl }: Props) {
   const [data, setData] = useState(initialData)
   const [isClosing, startClose] = useTransition()
   const [showAddInvite, setShowAddInvite] = useState(false)
@@ -61,6 +63,7 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
   const [addSuccess, setAddSuccess] = useState("")
   const [isResending, setIsResending] = useState(false)
   const [resendNote, setResendNote] = useState("")
+  const [copied, setCopied] = useState(false)
 
   const refresh = useCallback(async () => {
     const fresh = await fetch(`/api/polls/${pollId}/results`)
@@ -160,6 +163,40 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
               Add to calendar (.ics)
             </a>
           )}
+        </div>
+      )}
+
+      {h.status === "OPEN" && (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Share this poll yourself</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Anyone with this link can join by confirming their email — useful for a group
+              chat, and it skips the inbox entirely.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={shareUrl}
+              onFocus={(e) => e.currentTarget.select()}
+              className="flex-1 min-w-0 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+            />
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(shareUrl)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                } catch {
+                  // Clipboard can be blocked; the field is selectable either way.
+                }
+              }}
+              className="shrink-0 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
         </div>
       )}
 
