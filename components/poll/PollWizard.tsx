@@ -6,13 +6,19 @@ import { useRouter } from "next/navigation"
 interface GroupMember { id: string; name: string; email: string }
 interface Group { id: string; name: string; members: GroupMember[] }
 
-interface Props { groups: Group[] }
+interface Props {
+  groups: Group[]
+  /** Current display name, or a guess from the email when none is saved yet. */
+  defaultCreatorName: string
+  /** False when the guess is standing in for a name the user never set. */
+  hasSavedName: boolean
+}
 
 type PollType = "DATE_POLL" | "SINGLE_CHOICE" | "YES_NO_VETO"
 interface Option { label: string; dateValue: string; endDate: string }
 interface Invitee { name: string; email: string }
 
-export function PollWizard({ groups }: Props) {
+export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [step, setStep] = useState(1)
@@ -29,7 +35,8 @@ export function PollWizard({ groups }: Props) {
     { label: "", dateValue: "", endDate: "" },
   ])
 
-  // Step 3 — group/invitees, deadline, threshold, suggestions
+  // Step 3 — sender name, group/invitees, deadline, threshold, suggestions
+  const [creatorName, setCreatorName] = useState(defaultCreatorName)
   const [groupId, setGroupId] = useState("")
   const [extraInvitees, setExtraInvitees] = useState<Invitee[]>([])
   const [deadline, setDeadline] = useState("")
@@ -75,6 +82,7 @@ export function PollWizard({ groups }: Props) {
       }
     }
     if (step === 3) {
+      if (!creatorName.trim()) return setError("Add the name your invitees will see.")
       if (allInvitees.length === 0) return setError("Add at least one invitee.")
     }
     setStep((s) => s + 1)
@@ -85,6 +93,7 @@ export function PollWizard({ groups }: Props) {
     if (allInvitees.length === 0) return setError("Add at least one invitee.")
 
     const body = {
+      creatorName: creatorName.trim() || undefined,
       title: title.trim(),
       description: description.trim() || undefined,
       type: pollType,
@@ -231,6 +240,23 @@ export function PollWizard({ groups }: Props) {
       {/* Step 3: Invitees */}
       {step === 3 && (
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Your name</label>
+            <input
+              type="text"
+              placeholder="Ryan"
+              value={creatorName}
+              maxLength={60}
+              onChange={(e) => setCreatorName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              {creatorName.trim()
+                ? `Invitees see: “${creatorName.trim()} is planning ${title.trim() || "…"}”`
+                : "Shown in the invitation and the reminders."}
+              {!hasSavedName && " Saved for next time."}
+            </p>
+          </div>
           {groups.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Use a group</label>
@@ -322,6 +348,7 @@ export function PollWizard({ groups }: Props) {
       {step === 4 && (
         <div className="space-y-4">
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-gray-500">From</span><span className="font-medium">{creatorName.trim()}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Title</span><span className="font-medium">{title}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Type</span><span className="font-medium">{pollType.replace(/_/g, " ")}</span></div>
             {pollType !== "YES_NO_VETO" && (
