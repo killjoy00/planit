@@ -1,9 +1,8 @@
 import { db } from "@/lib/db"
-import { creatorDisplayName } from "@/lib/display-name"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { checkThreshold, determineWinner, isMultiSelect } from "@/lib/poll-logic"
-import { sendWinnerEmails } from "@/lib/email"
+import { checkThreshold, isMultiSelect } from "@/lib/poll-logic"
+import { CLOSABLE_POLL_INCLUDE, closePollAndAnnounce } from "@/lib/close-poll"
 
 const schema = z.object({
   /** Selections for a choice poll. A date poll may send several. */
@@ -92,39 +91,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   if (shouldAutoClose) {
     const fullPoll = await db.poll.findUnique({
       where: { id: participant.pollId },
-      include: { options: true, participants: true, votes: true, creator: { select: { name: true, email: true } }, },
+      include: CLOSABLE_POLL_INCLUDE,
     })
+    // A no-op close means another vote landing at the same moment already
+    // announced this result; `closePollAndAnnounce` will not send it twice.
     if (fullPoll && fullPoll.status === "OPEN") {
-      const winner = determineWinner(fullPoll)
-      await db.poll.update({
-        where: { id: participant.pollId },
-        data: { status: "CLOSED", winnerId: winner?.id ?? null },
-      })
-
-      if (winner) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-        const delivery = await sendWinnerEmails(
-          fullPoll.participants
-            .filter((p) => !p.optedOut)
-            .map((p) => ({
-              participantName: p.name,
-              participantEmail: p.email,
-              creatorName: creatorDisplayName(fullPoll.creator),
-              pollTitle: fullPoll.title,
-              winnerLabel: winner.label,
-              resultsUrl: `${appUrl}/polls/${fullPoll.id}`,
-              icsUrl: winner.dateValue ? `${appUrl}/api/polls/ics/${fullPoll.id}` : undefined,
-              unsubscribeUrl: `${appUrl}/api/unsubscribe/${p.token}`,
-              replyTo: fullPoll.replyToCreator ? fullPoll.creator.email ?? undefined : undefined,
-            }))
-        )
-        if (delivery.failed.length > 0) {
-          console.error(
-            `[winner] poll ${fullPoll.id}: result refused for ${delivery.failed.length} participants`,
-            delivery.failed,
-          )
-        }
-      }
+      await closePollAndAnnounce(fullPoll, "threshold")
     }
   }
 

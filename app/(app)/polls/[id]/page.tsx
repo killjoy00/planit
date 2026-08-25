@@ -4,6 +4,7 @@ import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { PollResults } from "@/components/poll/PollResults"
+import { appUrl } from "@/lib/site"
 
 export default async function PollPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -71,7 +72,7 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
         pollTitle={poll.title}
         icsAvailable={!!poll.winner?.dateValue}
         pollIdForIcs={id}
-        shareUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/join/${shareToken}`}
+        shareUrl={`${appUrl()}/join/${shareToken}`}
       />
     </div>
   )

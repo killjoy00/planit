@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { sendJoinVerification } from "@/lib/email"
 import { creatorDisplayName } from "@/lib/display-name"
+import { appUrl } from "@/lib/site"
 
 const schema = z.object({
   // Trimmed before validating, not after: a pasted address routinely carries
@@ -85,13 +86,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sha
     update: { name, expires: new Date(now.getTime() + EXPIRY_MS), lastSentAt: now },
   })
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
   const delivery = await sendJoinVerification({
     participantName: name,
     participantEmail: email,
     creatorName: creatorDisplayName(poll.creator),
     pollTitle: poll.title,
-    verifyUrl: `${appUrl}/join/verify/${request.token}`,
+    verifyUrl: `${appUrl()}/join/verify/${request.token}`,
   })
 
   if (delivery.failed.length > 0) {

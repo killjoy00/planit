@@ -2,13 +2,11 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { deliverInvites, normalizeInvitees } from "@/lib/invites"
+import { deliverInvites } from "@/lib/invites"
+import { contactSchema, normalizeContacts } from "@/lib/contacts"
 
 const schema = z.object({
-  invitees: z.array(z.object({
-    name: z.string().min(1),
-    email: z.string().email(),
-  })).min(1),
+  invitees: z.array(contactSchema).min(1),
 })
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 })
 
   const existingEmails = new Set(poll.participants.map((p) => p.email.toLowerCase()))
-  const newInvitees = normalizeInvitees(parsed.data.invitees).filter(
+  const newInvitees = normalizeContacts(parsed.data.invitees).filter(
     (i) => !existingEmails.has(i.email),
   )
 

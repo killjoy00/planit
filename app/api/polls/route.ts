@@ -2,10 +2,9 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { deliverInvites, normalizeInvitees } from "@/lib/invites"
+import { deliverInvites } from "@/lib/invites"
+import { contactSchema, normalizeContacts } from "@/lib/contacts"
 import { MAX_DISPLAY_NAME, normalizeDisplayName } from "@/lib/display-name"
-
-const inviteeSchema = z.object({ name: z.string().min(1), email: z.string().email() })
 
 const schema = z.object({
   /** How the creator wants to be named in the invitation. Saved for next time. */
@@ -19,7 +18,7 @@ const schema = z.object({
     endDate: z.string().datetime().optional(),
   })).min(1),
   groupId: z.string().optional(),
-  invitees: z.array(inviteeSchema).min(1),
+  invitees: z.array(contactSchema).min(1),
   deadline: z.string().datetime().optional(),
   threshold: z.number().int().positive().optional(),
   allowSuggestions: z.boolean().optional(),
@@ -38,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   // A group's members and the hand-typed extras overlap all the time, and two
   // rows for one address is a unique-constraint failure on the whole create.
-  const recipients = normalizeInvitees(invitees)
+  const recipients = normalizeContacts(invitees)
   if (recipients.length === 0) {
     return NextResponse.json({ error: "Add at least one invitee." }, { status: 400 })
   }
