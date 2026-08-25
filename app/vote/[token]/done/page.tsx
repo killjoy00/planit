@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
 
@@ -55,6 +56,23 @@ export default async function VoteDonePage({ params }: { params: Promise<{ token
             })}
           </div>
         )}
+
+        <div className="space-y-2 pt-2">
+          <Link
+            href={`/vote/${token}/results`}
+            className="block text-sm text-indigo-600 hover:underline"
+          >
+            See full results
+          </Link>
+          {poll.status === "OPEN" && (
+            <Link
+              href={`/vote/${token}`}
+              className="block text-sm text-gray-500 hover:text-gray-700 hover:underline"
+            >
+              Change your vote
+            </Link>
+          )}
+        </div>
       </div>
     </main>
   )

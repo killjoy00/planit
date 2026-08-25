@@ -19,14 +19,29 @@ interface Props {
   allowSuggestions: boolean
   /** Date polls: every option that works for this person, not just one. */
   multiSelect: boolean
+  /** They have answered before, so this is an edit and says so. */
+  hasVoted: boolean
+  initialSelectedIds: string[]
+  initialChoice: string | null
 }
 
-export function VotingForm({ token, pollType, options: initialOptions, participantName, optOutUrl, allowSuggestions, multiSelect }: Props) {
+export function VotingForm({
+  token,
+  pollType,
+  options: initialOptions,
+  participantName,
+  optOutUrl,
+  allowSuggestions,
+  multiSelect,
+  hasVoted,
+  initialSelectedIds,
+  initialChoice,
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [options, setOptions] = useState(initialOptions)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [choice, setChoice] = useState<string>("")
+  const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds)
+  const [choice, setChoice] = useState<string>(initialChoice ?? "")
   const [error, setError] = useState("")
   const [suggestion, setSuggestion] = useState("")
   const [isSuggesting, setIsSuggesting] = useState(false)
@@ -108,7 +123,9 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
   if (pollType === "YES_NO_VETO") {
     return (
       <div className="space-y-4">
-        <p className="text-sm font-medium text-gray-700">Your answer, {firstName}:</p>
+        <p className="text-sm font-medium text-gray-700">
+          {hasVoted ? `Your answer, ${firstName} — change it if you like:` : `Your answer, ${firstName}:`}
+        </p>
         <div className="grid grid-cols-3 gap-3">
           {[
             { value: "YES", label: "Yes!", emoji: "✅" },
@@ -135,9 +152,14 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
           disabled={isPending || !choice}
           className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors"
         >
-          {isPending ? "Submitting…" : "Submit vote"}
+          {isPending ? "Saving…" : hasVoted ? "Update my answer" : "Submit vote"}
         </button>
-        <div className="text-center">
+        <div className="text-center space-y-2">
+          {hasVoted && (
+            <a href={`/vote/${token}/results`} className="block text-sm text-indigo-600 hover:underline">
+              See where it stands
+            </a>
+          )}
           <a href={optOutUrl} className="text-sm text-gray-400 hover:text-gray-600 underline">
             I&apos;m out — remove me from this poll
           </a>
@@ -152,7 +174,13 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
     <div className="space-y-3">
       <div>
         <p className="text-sm font-medium text-gray-700">
-          {multiSelect ? `Pick every date that works, ${firstName}:` : `Pick one, ${firstName}:`}
+          {hasVoted
+            ? multiSelect
+              ? `The dates you picked, ${firstName} — add or remove any:`
+              : `Your pick, ${firstName} — change it if you like:`
+            : multiSelect
+              ? `Pick every date that works, ${firstName}:`
+              : `Pick one, ${firstName}:`}
         </p>
         {multiSelect && (
           <p className="text-sm text-gray-500 mt-0.5">
@@ -225,12 +253,21 @@ export function VotingForm({ token, pollType, options: initialOptions, participa
         className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors"
       >
         {isPending
-          ? "Submitting…"
-          : multiSelect && count > 0
-            ? `Submit ${count} date${count === 1 ? "" : "s"}`
-            : "Submit vote"}
+          ? "Saving…"
+          : hasVoted
+            ? multiSelect && count > 0
+              ? `Update to ${count} date${count === 1 ? "" : "s"}`
+              : "Update my vote"
+            : multiSelect && count > 0
+              ? `Submit ${count} date${count === 1 ? "" : "s"}`
+              : "Submit vote"}
       </button>
-      <div className="text-center">
+      <div className="text-center space-y-2">
+        {hasVoted && (
+          <a href={`/vote/${token}/results`} className="block text-sm text-indigo-600 hover:underline">
+            See where it stands
+          </a>
+        )}
         <a href={optOutUrl} className="text-sm text-gray-400 hover:text-gray-600 underline">
           I&apos;m out — remove me from this poll
         </a>

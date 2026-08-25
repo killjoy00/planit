@@ -43,6 +43,10 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
   const [threshold, setThreshold] = useState("")
   const [allowSuggestions, setAllowSuggestions] = useState(false)
   const [replyToCreator, setReplyToCreator] = useState(false)
+  // Counting back from the deadline only means anything when there is one, so
+  // this follows the deadline field rather than sitting as a separate choice
+  // the creator has to remember to revisit.
+  const [remindBeforeDeadline, setRemindBeforeDeadline] = useState(true)
 
   const selectedGroup = groups.find((g) => g.id === groupId)
   const groupMembers: Invitee[] = selectedGroup?.members ?? []
@@ -111,6 +115,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
       threshold: threshold ? parseInt(threshold) : undefined,
       allowSuggestions,
       replyToCreator,
+      reminderSchedule: deadline && remindBeforeDeadline ? "BEFORE_DEADLINE" : "AFTER_SEND",
     }
 
     startTransition(async () => {
@@ -326,6 +331,43 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
               />
             </div>
           </div>
+          <div className="rounded-xl border-2 border-gray-200 bg-white px-4 py-3">
+            <p className="text-sm font-medium text-gray-900">Remind people who haven&apos;t voted</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRemindBeforeDeadline(false)}
+                className={`rounded-lg border-2 px-3 py-2 text-left transition-all ${
+                  !deadline || !remindBeforeDeadline
+                    ? "border-indigo-500 bg-indigo-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <span className="block text-xs font-medium text-gray-900">After sending</span>
+                <span className="block text-xs text-gray-500 mt-0.5">24h, 48h, 96h</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => deadline && setRemindBeforeDeadline(true)}
+                disabled={!deadline}
+                className={`rounded-lg border-2 px-3 py-2 text-left transition-all disabled:opacity-40 ${
+                  deadline && remindBeforeDeadline
+                    ? "border-indigo-500 bg-indigo-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <span className="block text-xs font-medium text-gray-900">Before the deadline</span>
+                <span className="block text-xs text-gray-500 mt-0.5">72h, 48h, 24h</span>
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {!deadline
+                ? "Set a deadline above to count reminders back from it."
+                : remindBeforeDeadline
+                  ? "The last nudge lands a day before you need an answer."
+                  : "Timed from when the invitations go out."}
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => setAllowSuggestions((v) => !v)}
@@ -378,6 +420,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
             )}
             <div className="flex justify-between"><span className="text-gray-500">Invitees</span><span className="font-medium">{allInvitees.length} people</span></div>
             {deadline && <div className="flex justify-between"><span className="text-gray-500">Deadline</span><span className="font-medium">{new Date(deadline).toLocaleDateString()}</span></div>}
+            <div className="flex justify-between"><span className="text-gray-500">Reminders</span><span className="font-medium">{deadline && remindBeforeDeadline ? "72h/48h/24h before deadline" : "24h/48h/96h after sending"}</span></div>
           </div>
           <p className="text-sm text-gray-500">
             {allInvitees.length} invite email{allInvitees.length !== 1 ? "s" : ""} will be sent immediately.

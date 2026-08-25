@@ -112,6 +112,9 @@ model Poll {
   /// that proved it can receive mail.
   shareToken        String?       @unique @default(cuid())
   reminderLevel     Int           @default(0)
+  /// Whether nudges are timed from when the poll went out or from when the
+  /// answer is needed. See `lib/reminder-schedule.ts`.
+  reminderSchedule  ReminderSchedule @default(AFTER_SEND)
   lastReminderAt DateTime?
   winnerId       String?
   winner         PollOption?   @relation("PollWinner", fields: [winnerId], references: [id], onDelete: SetNull)
@@ -130,6 +133,18 @@ enum PollStatus {
   OPEN
   CLOSED
   CANCELLED
+}
+
+/// When to chase the people who haven't answered.
+///
+/// `AFTER_SEND` counts from the moment the invitations went out, which is the
+/// only thing to count from when a poll has no deadline. `BEFORE_DEADLINE`
+/// counts back from the moment the answer is actually needed — the nudge that
+/// lands the day before is worth more than the one that lands because the poll
+/// happens to be a day old.
+enum ReminderSchedule {
+  AFTER_SEND
+  BEFORE_DEADLINE
 }
 
 // ── Poll options ─────────────────────────────────────────────────────────────

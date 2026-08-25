@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { PollResults } from "@/components/poll/PollResults"
 import { appUrl } from "@/lib/site"
+import { describeSchedule } from "@/lib/reminder-schedule"
 
 export default async function PollPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -45,6 +46,11 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mt-1">{poll.title}</h1>
         {poll.description && <p className="mt-1 text-gray-600">{poll.description}</p>}
+        {poll.status === "OPEN" && poll.reminderLevel < 3 && (
+          <p className="mt-2 text-xs text-gray-400">
+            Reminding people who haven&apos;t voted: {describeSchedule(poll)}
+          </p>
+        )}
       </div>
 
       <PollResults
