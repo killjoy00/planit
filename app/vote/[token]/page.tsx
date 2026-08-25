@@ -2,6 +2,7 @@ import { db } from "@/lib/db"
 import { notFound, redirect } from "next/navigation"
 import { VotingForm } from "@/components/vote/VotingForm"
 import { isMultiSelect } from "@/lib/poll-logic"
+import { creatorDisplayName } from "@/lib/display-name"
 
 export default async function VotePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -12,7 +13,7 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
       poll: {
         include: {
           options: { orderBy: { order: "asc" } },
-          creator: { select: { name: true } },
+          creator: { select: { name: true, email: true } },
           participants: { select: { id: true, votedAt: true, optedOut: true } },
         },
       },
@@ -42,7 +43,7 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
       <div className="max-w-md mx-auto space-y-6">
         <div>
           <p className="text-sm text-gray-500">
-            {participant.poll.creator.name ?? "Someone"} wants your vote
+            {creatorDisplayName(participant.poll.creator)} wants your vote
           </p>
           <h1 className="text-2xl font-bold text-gray-900 mt-1">{participant.poll.title}</h1>
           {participant.poll.description && (

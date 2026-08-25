@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyCronSecret } from "@/lib/cron-auth"
 import { sendReminderEmails } from "@/lib/email"
 import { creatorDisplayName } from "@/lib/display-name"
+import { appUrl } from "@/lib/site"
 
 const HOURS = 60 * 60 * 1000
 
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
 
     const voted = poll.participants.filter((p) => p.votedAt && !p.optedOut).length
     const total = poll.participants.filter((p) => !p.optedOut).length
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+    const base = appUrl()
     const creatorName = creatorDisplayName(poll.creator)
     const pendingNames = unvoted.map((p) => p.name)
 
@@ -43,9 +44,9 @@ export async function GET(req: NextRequest) {
         participantEmail: p.email,
         creatorName,
         pollTitle: poll.title,
-        voteUrl: `${appUrl}/vote/${p.token}`,
-        optOutUrl: `${appUrl}/vote/${p.token}/opted-out`,
-        unsubscribeUrl: `${appUrl}/api/unsubscribe/${p.token}`,
+        voteUrl: `${base}/vote/${p.token}`,
+        optOutUrl: `${base}/vote/${p.token}/opted-out`,
+        unsubscribeUrl: `${base}/api/unsubscribe/${p.token}`,
         replyTo: poll.replyToCreator ? poll.creator.email ?? undefined : undefined,
         votedCount: voted,
         totalCount: total,

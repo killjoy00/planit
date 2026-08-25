@@ -6,10 +6,15 @@ import { GET as runAutoClose } from "../auto-close/route"
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const [autoCloseRes, remindersRes] = await Promise.all([
-    runAutoClose(req),
-    runReminders(req),
-  ])
+  // Sequential, and auto-close first, deliberately.
+  //
+  // Run in parallel, both handlers select `status: OPEN` before either writes
+  // `CLOSED`, so a poll whose deadline has just passed lands in both sets: the
+  // guest list gets "you still haven't voted" and "it's decided" from the same
+  // nightly run, in whichever order the provider delivers them. Closing first
+  // takes those polls out of the reminder query.
+  const autoCloseRes = await runAutoClose(req)
+  const remindersRes = await runReminders(req)
 
   return NextResponse.json({
     autoClose: await autoCloseRes.json(),

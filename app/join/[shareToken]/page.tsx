@@ -1,6 +1,7 @@
 import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
 import { JoinForm } from "@/components/join/JoinForm"
+import { creatorDisplayName } from "@/lib/display-name"
 
 export default async function JoinPage({ params }: { params: Promise<{ shareToken: string }> }) {
   const { shareToken } = await params
@@ -15,7 +16,6 @@ export default async function JoinPage({ params }: { params: Promise<{ shareToke
   })
   if (!poll) notFound()
 
-  const { creatorDisplayName } = await import("@/lib/display-name")
   const creatorName = creatorDisplayName(poll.creator)
 
   if (poll.status !== "OPEN") {

@@ -1,33 +1,7 @@
 import { db } from "./db"
 import { sendInviteEmails, type DeliveryResult, type InviteEmailProps } from "./email"
 import { creatorDisplayName } from "./display-name"
-
-export interface Invitee {
-  name: string
-  email: string
-}
-
-/**
- * Trim and case-fold addresses, then drop repeats.
- *
- * The poll wizard concatenates a group's members with any extra invitees typed
- * by hand, so the same person routinely arrives twice. An exact repeat used to
- * violate `@@unique([pollId, email])` and fail the whole poll create — no poll
- * and no invitations for anyone — while one differing only in case slipped
- * through as two participants holding two different vote links.
- */
-export function normalizeInvitees(invitees: Invitee[]): Invitee[] {
-  const seen = new Set<string>()
-  const unique: Invitee[] = []
-  for (const invitee of invitees) {
-    const email = invitee.email.trim().toLowerCase()
-    const name = invitee.name.trim()
-    if (!email || !name || seen.has(email)) continue
-    seen.add(email)
-    unique.push({ name, email })
-  }
-  return unique
-}
+import { appUrl } from "./site"
 
 interface InvitePoll {
   id: string
@@ -57,7 +31,7 @@ function formatDateRange(start: Date | null, end: Date | null): string | undefin
 }
 
 function inviteProps(poll: InvitePoll, participants: InviteParticipant[]): InviteEmailProps[] {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+  const base = appUrl()
   const creatorName = creatorDisplayName(poll.creator)
   const options = poll.options.map((o) => ({
     label: o.label,
@@ -73,10 +47,10 @@ function inviteProps(poll: InvitePoll, participants: InviteParticipant[]): Invit
     pollTitle: poll.title,
     pollDescription: poll.description ?? undefined,
     pollType: poll.type,
-    voteUrl: `${appUrl}/vote/${p.token}`,
+    voteUrl: `${base}/vote/${p.token}`,
     deadline: poll.deadline ?? undefined,
     options,
-    unsubscribeUrl: `${appUrl}/api/unsubscribe/${p.token}`,
+    unsubscribeUrl: `${base}/api/unsubscribe/${p.token}`,
     replyTo,
   }))
 }
