@@ -4,8 +4,7 @@ import { verifyCronSecret } from "@/lib/cron-auth"
 import { sendReminderEmails } from "@/lib/email"
 import { creatorDisplayName } from "@/lib/display-name"
 import { appUrl } from "@/lib/site"
-
-const HOURS = 60 * 60 * 1000
+import { dueReminderLevel } from "@/lib/reminder-schedule"
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -22,11 +21,11 @@ export async function GET(req: NextRequest) {
   const results: { pollId: string; level: number; sent: number; failed: number }[] = []
 
   for (const poll of openPolls) {
-    const ageMs = now.getTime() - poll.createdAt.getTime()
-    const thresholds = [24 * HOURS, 72 * HOURS, 120 * HOURS]
-    const nextLevel = poll.reminderLevel + 1 as 1 | 2 | 3
-    if (nextLevel > 3) continue
-    if (ageMs < thresholds[nextLevel - 1]) continue
+    // Which nudge is due depends on the poll's schedule: counted up from the
+    // send, or back from the deadline. `dueReminderLevel` also decides what
+    // happens to steps a late-created poll is already past.
+    const nextLevel = dueReminderLevel(poll, now)
+    if (nextLevel === null) continue
 
     const unvoted = poll.participants.filter((p) => !p.votedAt && !p.optedOut)
     if (unvoted.length === 0) continue

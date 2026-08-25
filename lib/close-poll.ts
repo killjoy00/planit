@@ -77,7 +77,10 @@ export async function closePollAndAnnounce(
         creatorName,
         pollTitle: poll.title,
         winnerLabel: winner.label,
-        resultsUrl: `${base}/polls/${poll.id}`,
+        // Per-participant, not `/polls/{id}`: that is the creator's dashboard
+        // behind a session and an ownership check, so for everyone receiving
+        // this email it was a redirect to sign-in and then a 404.
+        resultsUrl: `${base}/vote/${p.token}/results`,
         icsUrl: winner.dateValue ? `${base}/api/polls/ics/${poll.id}` : undefined,
         unsubscribeUrl: `${base}/api/unsubscribe/${p.token}`,
         replyTo,

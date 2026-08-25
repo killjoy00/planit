@@ -23,6 +23,8 @@ const schema = z.object({
   threshold: z.number().int().positive().optional(),
   allowSuggestions: z.boolean().optional(),
   replyToCreator: z.boolean().optional(),
+  /** How nudges are timed. Counting back from a deadline needs one to exist. */
+  reminderSchedule: z.enum(["AFTER_SEND", "BEFORE_DEADLINE"]).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -33,13 +35,23 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
-  const { title, description, type, options, groupId, invitees, deadline, threshold, allowSuggestions, replyToCreator } = parsed.data
+  const { title, description, type, options, groupId, invitees, deadline, threshold, allowSuggestions, replyToCreator, reminderSchedule } = parsed.data
 
   // A group's members and the hand-typed extras overlap all the time, and two
   // rows for one address is a unique-constraint failure on the whole create.
   const recipients = normalizeContacts(invitees)
   if (recipients.length === 0) {
     return NextResponse.json({ error: "Add at least one invitee." }, { status: 400 })
+  }
+
+  // Rejected rather than quietly downgraded: a creator who picked
+  // "before the deadline" and got silent creation-time nudges instead would
+  // have no way to tell until the reminders landed at the wrong moment.
+  if (reminderSchedule === "BEFORE_DEADLINE" && !deadline) {
+    return NextResponse.json(
+      { error: "Reminders before the deadline need a deadline." },
+      { status: 400 },
+    )
   }
 
   // Remember the sender's name on the account, so later polls and the reminder
@@ -63,6 +75,7 @@ export async function POST(req: NextRequest) {
       threshold: threshold ?? null,
       allowSuggestions: allowSuggestions ?? false,
       replyToCreator: replyToCreator ?? false,
+      reminderSchedule: reminderSchedule ?? "AFTER_SEND",
       options: {
         create: options.map((opt, i) => ({
           label: opt.label,

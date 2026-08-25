@@ -22,8 +22,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
   if (!participant) return NextResponse.json({ error: "Invalid link" }, { status: 404 })
   if (participant.optedOut) return NextResponse.json({ error: "Opted out" }, { status: 400 })
-  if (participant.votedAt) return NextResponse.json({ error: "Already voted" }, { status: 400 })
+  // Answering again is allowed while the poll is open, and replaces the
+  // previous ballot. Plans change between the invitation and the deadline —
+  // a date stops working, someone reads the description properly — and until
+  // now the only way to correct a mis-tap was to email the creator, who had no
+  // way to edit a ballot either. Once the poll is closed the result has been
+  // announced, so the answer is fixed.
   if (participant.poll.status !== "OPEN") return NextResponse.json({ error: "Poll is closed" }, { status: 400 })
+  const isChange = participant.votedAt !== null
 
   const body = await req.json()
   const parsed = schema.safeParse(body)
@@ -62,6 +68,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   }
 
   await db.$transaction([
+    // Replace rather than add: a ballot is the whole of one person's answer,
+    // and on a date poll it is several rows, so the old ones have to go or
+    // dropping a date would leave it still counted.
+    db.vote.deleteMany({ where: { participantId: participant.id } }),
     db.vote.createMany({
       data:
         poll.type === "YES_NO_VETO"
@@ -100,5 +110,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     }
   }
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, changed: isChange })
 }
