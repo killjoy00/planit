@@ -236,6 +236,32 @@ model JoinRequest {
   @@unique([pollId, email])
 }
 
+// ── Sign-in abuse control ────────────────────────────────────────────────────
+
+/// One sign-in link we were asked to send, recorded so the public login form
+/// cannot be used to mail a stranger repeatedly.
+///
+/// The form takes an address from anyone and sends mail to it — that is what a
+/// magic link is — so without this it is an open relay for one specific
+/// message. Address-bombing campaigns submit a victim's address to hundreds of
+/// such forms at once to bury a real notification, and every one of those sends
+/// costs the sending domain a little more of its reputation.
+///
+/// Deliberately not tied to `User`: most of these are addresses that have no
+/// account and never will. Rows are disposable and pruned by the daily cron.
+model SignInAttempt {
+  id        String   @id @default(cuid())
+  /// Always stored lowercased, as Auth.js normalises the address before this.
+  email     String
+  /// Best-effort client address, for capping one source that cycles addresses.
+  /// Null when no forwarding header was present.
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+}
+
 // ── Suppression ──────────────────────────────────────────────────────────────
 
 /// Addresses that must never be mailed again, however they got here.

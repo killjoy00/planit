@@ -12,7 +12,10 @@ import { useState } from "react"
 const AUTH_ERRORS: Record<string, string> = {
   Verification:
     "That sign-in link is no longer valid — it either expired or was already used. Enter your email and we'll send a fresh one.",
-  AccessDenied: "That address isn't allowed to sign in.",
+  // The only thing that refuses a send is the rate limit in `lib/auth.ts`, so
+  // this is what AccessDenied means here in practice.
+  AccessDenied:
+    "We've just sent a link to that address, or it has been asked for too many times. Give it a minute and check your inbox — including spam.",
   Configuration: "Sign-in is temporarily unavailable. Please try again in a moment.",
 }
 
@@ -48,7 +51,10 @@ export function LoginForm() {
     try {
       const result = await signIn("resend", { email, redirect: false, callbackUrl })
       if (result?.error) {
-        setError(`Sign-in failed: ${result.error}. Please try again.`)
+        // Auth.js hands back a code, not a sentence. Printing it raw showed
+        // people "Sign-in failed: AccessDenied", which reads like an
+        // accusation when it is usually just the one-a-minute limit.
+        setError(AUTH_ERRORS[result.error] ?? "Something went wrong signing you in. Please try again.")
       } else {
         setSent(true)
       }

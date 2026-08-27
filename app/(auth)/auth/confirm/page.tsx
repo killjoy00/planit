@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { ConfirmSignIn } from "@/components/auth/ConfirmSignIn"
 import { ResendMagicLink } from "@/components/auth/ResendMagicLink"
-import { buildCallbackUrl, peekVerificationToken } from "@/lib/magic-link"
+import { peekVerificationToken } from "@/lib/magic-link"
 
 export const metadata: Metadata = {
   title: "Confirm sign-in",
@@ -88,19 +89,13 @@ export default async function ConfirmPage({ searchParams }: { searchParams: Sear
         </p>
       </div>
       {/*
-        A plain anchor, not next/link: this href is the Auth.js callback, and it
-        is the one request that spends the token. next/link would prefetch it on
-        hover and sign the reader in behind their back. Nothing on this page may
-        touch that URL until the button is actually pressed.
+        No link to the callback appears on this page at all — not an anchor,
+        not a next/link. The callback signs you in on a GET, so any link to it
+        here is one a mail scanner can follow, and enterprise filters follow
+        links two hops deep. The button POSTs instead, and only then is the
+        callback URL handed back.
       */}
-      <a
-        href={buildCallbackUrl({ token, email, callbackUrl })}
-        rel="nofollow noreferrer"
-        referrerPolicy="no-referrer"
-        className="mt-6 block w-full rounded-lg bg-indigo-600 py-3 text-center text-base font-semibold text-white transition-colors hover:bg-indigo-700"
-      >
-        Sign in to planit →
-      </a>
+      <ConfirmSignIn token={token} email={email} callbackUrl={callbackUrl} />
       <p className="mt-4 text-center text-sm text-gray-400">
         Didn&apos;t ask to sign in? Close this page — nothing happens until you press the
         button.
