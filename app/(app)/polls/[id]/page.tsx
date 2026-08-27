@@ -4,6 +4,7 @@ import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { PollResults } from "@/components/poll/PollResults"
+import { PollSettings } from "@/components/poll/PollSettings"
 import { appUrl } from "@/lib/site"
 import { describeSchedule } from "@/lib/reminder-schedule"
 
@@ -53,6 +54,17 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
         )}
       </div>
 
+      <PollSettings
+        pollId={poll.id}
+        status={poll.status}
+        title={poll.title}
+        description={poll.description}
+        deadline={poll.deadline?.toISOString() ?? null}
+        threshold={poll.threshold}
+        reminderSchedule={poll.reminderSchedule}
+        replyToCreator={poll.replyToCreator}
+      />
+
       <PollResults
         pollId={id}
         initialData={{
@@ -65,20 +77,25 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
             endDate: o.endDate?.toISOString() ?? null,
             suggestedByName: o.suggestedByName,
             voteCount: 0,
+            idealCount: 0,
           })),
           participants: poll.participants.map((p) => ({
             id: p.id, name: p.name, email: p.email,
             voted: !!p.votedAt, optedOut: p.optedOut,
             inviteDelivered: !!p.inviteSentAt,
+            resultDelivered: !!p.resultSentAt,
             optionIds: p.votes.map((v) => v.optionId).filter((id): id is string => !!id),
             choice: p.votes.find((v) => v.choice)?.choice ?? null,
+            preferences: p.votes
+              .filter((v) => v.optionId && v.preference)
+              .map((v) => ({ optionId: v.optionId!, preference: v.preference! })),
           })),
         }}
         pollType={poll.type}
-        pollTitle={poll.title}
         icsAvailable={!!poll.winner?.dateValue}
         pollIdForIcs={id}
         shareUrl={`${appUrl()}/join/${shareToken}`}
+        timeZone={poll.timeZone}
       />
     </div>
   )

@@ -10,7 +10,7 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
   const participant = await db.participant.findUnique({
     where: { token },
     include: {
-      votes: { select: { optionId: true, choice: true } },
+      votes: { select: { optionId: true, choice: true, preference: true } },
       poll: {
         include: {
           options: { orderBy: { order: "asc" } },
@@ -48,6 +48,11 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
     .map((v) => v.optionId)
     .filter((id): id is string => !!id)
   const choice = participant.votes.find((v) => v.choice)?.choice ?? null
+  const preferences = participant.votes
+    .filter((vote): vote is typeof vote & { optionId: string; preference: "IDEAL" | "AVAILABLE" } =>
+      !!vote.optionId && !!vote.preference,
+    )
+    .map((vote) => ({ optionId: vote.optionId, preference: vote.preference }))
 
   return (
     <main className="flex-1 bg-gray-50 px-4 py-8">
@@ -81,6 +86,8 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
           hasVoted={hasVoted}
           initialSelectedIds={selectedIds}
           initialChoice={choice}
+          initialPreferences={preferences}
+          timeZone={participant.poll.timeZone}
         />
       </div>
     </main>

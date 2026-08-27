@@ -31,7 +31,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pol
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  const ics = generateICS(poll.title, poll.winner.dateValue, poll.description ?? undefined, poll.winner.endDate)
+  const ics = generateICS(
+    poll.title,
+    poll.winner.dateValue,
+    poll.description ?? undefined,
+    poll.winner.endDate,
+    poll.type === "DATE_POLL",
+  )
   return new NextResponse(ics, {
     headers: {
       "Content-Type": "text/calendar",

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import Link from "next/link"
 import { formatDistanceToNow } from "@/lib/date-utils"
+import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -34,11 +35,11 @@ export default async function DashboardPage() {
     }),
   ])
 
-  function formatWinnerDate(start: Date | null, end: Date | null): string | null {
+  function formatWinnerDate(start: Date | null, end: Date | null, type: string, timeZone: string | null): string | null {
     if (!start) return null
-    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    if (!end) return start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-    return `${fmt(start)} – ${fmt(end)}, ${end.getFullYear()}`
+    return type === "TIME_POLL" && timeZone
+      ? formatTimeSlot(start, end, timeZone)
+      : formatDateRange(start, end, true)
   }
 
   return (
@@ -95,7 +96,9 @@ export default async function DashboardPage() {
         ) : (
           <div className="space-y-2">
             {pastPolls.map((poll) => {
-              const winnerDate = poll.winner ? formatWinnerDate(poll.winner.dateValue, poll.winner.endDate) : null
+              const winnerDate = poll.winner
+                ? formatWinnerDate(poll.winner.dateValue, poll.winner.endDate, poll.type, poll.timeZone)
+                : null
               return (
                 <Link
                   key={poll.id}

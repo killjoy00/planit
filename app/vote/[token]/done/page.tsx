@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
+import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
 
 export default async function VoteDonePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -11,6 +12,7 @@ export default async function VoteDonePage({ params }: { params: Promise<{ token
       poll: {
         include: {
           options: { include: { votes: true }, orderBy: { order: "asc" } },
+          votes: { select: { choice: true } },
           participants: { select: { votedAt: true, optedOut: true } },
           winner: true,
         },
@@ -37,6 +39,29 @@ export default async function VoteDonePage({ params }: { params: Promise<{ token
           <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-6">
             <p className="text-sm text-indigo-600 font-medium uppercase tracking-wide">Winner</p>
             <p className="text-xl font-bold text-gray-900 mt-1">{poll.winner.label}</p>
+            {poll.winner.dateValue && (
+              <p className="mt-1 text-sm text-gray-500">
+                {poll.type === "TIME_POLL" && poll.timeZone
+                  ? formatTimeSlot(poll.winner.dateValue, poll.winner.endDate, poll.timeZone)
+                  : formatDateRange(poll.winner.dateValue, poll.winner.endDate)}
+              </p>
+            )}
+          </div>
+        ) : poll.type === "YES_NO_VETO" ? (
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: "YES", label: "Yes", emoji: "✅" },
+              { value: "FINE", label: "Fine", emoji: "🤷" },
+              { value: "NO", label: "Hard no", emoji: "❌" },
+            ].map((choice) => (
+              <div key={choice.value} className="rounded-xl border border-gray-200 bg-white py-3">
+                <p className="text-xl">{choice.emoji}</p>
+                <p className="font-bold text-gray-900">
+                  {poll.votes.filter((vote) => vote.choice === choice.value).length}
+                </p>
+                <p className="text-xs text-gray-500">{choice.label}</p>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="space-y-2">
@@ -44,13 +69,25 @@ export default async function VoteDonePage({ params }: { params: Promise<{ token
             {poll.options.map((opt) => {
               const count = opt.votes.length
               const pct = total > 0 ? Math.round((count / total) * 100) : 0
+              const ideal = opt.votes.filter((vote) => vote.preference === "IDEAL").length
               return (
-                <div key={opt.id} className="flex items-center gap-3">
-                  <span className="text-sm text-gray-600 w-40 text-left truncate">{opt.label}</span>
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                <div key={opt.id} className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-600 w-40 text-left truncate">{opt.label}</span>
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-sm text-gray-500 shrink-0 text-right">
+                      {poll.type === "TIME_POLL" ? `${count} · ${ideal} ideal` : count}
+                    </span>
                   </div>
-                  <span className="text-sm text-gray-500 w-8 text-right">{count}</span>
+                  {opt.dateValue && (
+                    <p className="text-xs text-left text-gray-400">
+                      {poll.type === "TIME_POLL" && poll.timeZone
+                        ? formatTimeSlot(opt.dateValue, opt.endDate, poll.timeZone)
+                        : formatDateRange(opt.dateValue, opt.endDate)}
+                    </p>
+                  )}
                 </div>
               )
             })}
