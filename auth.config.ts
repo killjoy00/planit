@@ -14,7 +14,7 @@ export const authConfig = {
       const { pathname } = request.nextUrl
       const isAuthed = !!auth?.user
 
-      const protectedPrefixes = ["/dashboard", "/groups", "/polls"]
+      const protectedPrefixes = ["/dashboard", "/groups", "/polls", "/admin"]
       const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p))
 
       if (isProtected && !isAuthed) return false

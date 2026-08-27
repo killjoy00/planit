@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const protectedPrefixes = ["/dashboard", "/groups", "/polls"]
+const protectedPrefixes = ["/dashboard", "/groups", "/polls", "/admin"]
 const CANONICAL_HOST = "planitnow.us"
 
 export function proxy(request: NextRequest) {
