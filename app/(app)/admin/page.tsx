@@ -40,6 +40,7 @@ export default async function AdminPage() {
 
   const [
     totalUsers,
+    totalCreators,
     totalGroups,
     totalPolls,
     openPolls,
@@ -59,6 +60,11 @@ export default async function AdminPage() {
     pollSeriesRaw,
   ] = await Promise.all([
     db.user.count(),
+    // Signing in and actually planning something are different acts. A `User`
+    // row appears the moment someone completes the magic link, so the total
+    // counts everyone who ever got curious enough to click through; this counts
+    // the ones who went on to create a poll.
+    db.user.count({ where: { polls: { some: {} } } }),
     db.group.count(),
     db.poll.count(),
     db.poll.count({ where: { status: "OPEN" } }),
@@ -108,6 +114,10 @@ export default async function AdminPage() {
   const votableParticipants = totalParticipants - optedOutParticipants
   const voteRate = votableParticipants > 0 ? Math.round((votedParticipants / votableParticipants) * 100) : 0
 
+  // How many of the people who signed in went on to plan something. Guarded
+  // because a brand-new deployment has no users to divide by.
+  const creatorRate = totalUsers > 0 ? Math.round((totalCreators / totalUsers) * 100) : 0
+
   const userSeries = fillDays(userSeriesRaw, SERIES_DAYS)
   const pollSeries = fillDays(pollSeriesRaw, SERIES_DAYS)
 
@@ -121,8 +131,9 @@ export default async function AdminPage() {
       </div>
 
       <section>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatTile label="Creators" value={totalUsers} sub={`+${usersLast7d} this week`} />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <StatTile label="Users" value={totalUsers} sub={`+${usersLast7d} this week · signed in`} />
+          <StatTile label="Creators" value={totalCreators} sub={`${creatorRate}% of users made a poll`} />
           <StatTile label="Polls" value={totalPolls} sub={`${openPolls} open · +${pollsLast7d} this week`} />
           <StatTile label="Vote-through rate" value={`${voteRate}%`} sub={`${votedParticipants} of ${votableParticipants}`} />
           <StatTile label="Groups" value={totalGroups} />
@@ -130,7 +141,9 @@ export default async function AdminPage() {
       </section>
 
       <section className="grid sm:grid-cols-2 gap-8">
-        <DailyBars title="New creators" series={userSeries} />
+        {/* Counts `User` rows, so it is new sign-ins — not new creators, which
+            is now a narrower thing (see the tiles above). */}
+        <DailyBars title="New users" series={userSeries} />
         <DailyBars title="New polls" series={pollSeries} />
       </section>
 
@@ -163,6 +176,9 @@ export default async function AdminPage() {
           Active creators, last 30 days
         </h2>
         <p className="text-2xl font-bold text-gray-900">{activeCreators30d.length}</p>
+        <p className="mt-0.5 text-xs text-gray-400">
+          Distinct people who created a poll recently, not the all-time {totalCreators} above.
+        </p>
       </section>
 
       <section>
