@@ -5,6 +5,7 @@ import { Resend as ResendClient } from "resend"
 import { render } from "@react-email/render"
 import { db } from "./db"
 import { buildConfirmUrl, verificationSecret } from "./magic-link"
+import { clientIp, recordSignInAttempt, refuseSignIn } from "./signin-rate-limit"
 import { authConfig } from "@/auth.config"
 import MagicLinkEmail from "@/emails/magic-link"
 
@@ -59,6 +60,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
+    /**
+     * Gate on who we are willing to mail a sign-in link to.
+     *
+     * Auth.js runs this before it mints a verification token or calls the
+     * mailer, so refusing here costs a database read and nothing else — no
+     * orphan token, no message. It also runs on the callback leg, where
+     * `email.verificationRequest` is absent; only the send is rate limited,
+     * because someone holding a valid token has already been mailed.
+     *
+     * The login form is public and takes any address, which is what a magic
+     * link is — so without this it will send mail to whoever a stranger types
+     * in, as often as they ask.
+     */
+    async signIn({ user, email }) {
+      if (!email?.verificationRequest) return true
+
+      const address = user?.email
+      if (!address) return false
+
+      const ip = await clientIp()
+      const refusal = await refuseSignIn(address, ip)
+      if (refusal) {
+        console.warn(`[signin] refused ${refusal} for ${address}${ip ? ` from ${ip}` : ""}`)
+        return false
+      }
+
+      await recordSignInAttempt(address, ip)
+      return true
+    },
     session({ session, user }) {
       session.user.id = user.id
       return session

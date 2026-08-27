@@ -28,15 +28,30 @@ resource that anything merely touching it destroys: a long-press that fires
 navigation, an inbox link scanner, a browser prefetch. Readers who tapped the
 link to copy it were then pasting a link that was already dead.
 
-`/auth/confirm` looks the token up without spending it (`lib/magic-link.ts`) and
-only its button reaches the callback, so the link survives every accidental open.
-That also makes it safe to print the URL as copyable plain text in the email body
-alongside the button. Dead links (expired, or already signed someone in) land on
-the same page, which offers a fresh one without retyping the address; failures
-that reach the callback anyway are routed to `/login?error=…` by `pages.error`.
+`/auth/confirm` looks the token up without spending it (`lib/magic-link.ts`), so
+the link survives every accidental open. That also makes it safe to print the URL
+as copyable plain text in the email body alongside the button. Dead links
+(expired, or already signed someone in) land on the same page, which offers a
+fresh one without retyping the address; failures that reach the callback anyway
+are routed to `/login?error=…` by `pages.error`.
 
 Nothing on that page may prefetch or auto-follow the callback URL — that is what
-makes the whole arrangement work.
+makes the whole arrangement work, and one hop was not enough on its own. The
+button used to be an anchor pointing straight at the callback, and enterprise
+mail filters detonate links two hops deep: they fetch the emailed link, then
+follow the links on the page it returns. That completed the sign-in by itself —
+an account and a live session with nobody having clicked. So the page now
+contains no link to the callback at all; the button POSTs to
+`/api/auth/confirm`, which hands the callback URL back only then. Link-following
+does not POST.
+
+The send side is rate limited in the `signIn` callback in `lib/auth.ts`, which
+Auth.js runs before it mints a token or calls the mailer: one link per address
+per minute, five a day, and fifteen an hour from one source
+(`lib/signin-rate-limit.ts`). The login form is public and will mail whoever is
+typed into it — that is what a magic link is — so without this it is an open
+relay for that one message, and address-bombing campaigns find those. Attempts
+are recorded in `SignInAttempt` and pruned by the daily cron.
 
 Guide metadata lives in `lib/guides.ts` (index page, sitemap, per-page `<title>`);
 each guide's prose lives in its own route file. Adding a guide means an entry in the

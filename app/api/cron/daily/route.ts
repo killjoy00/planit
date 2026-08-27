@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyCronSecret } from "@/lib/cron-auth"
 import { GET as runReminders } from "../reminders/route"
 import { GET as runAutoClose } from "../auto-close/route"
+import { pruneSignInAttempts } from "@/lib/signin-rate-limit"
 
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -16,8 +17,14 @@ export async function GET(req: NextRequest) {
   const autoCloseRes = await runAutoClose(req)
   const remindersRes = await runReminders(req)
 
+  // Rate-limit bookkeeping only, and every window it feeds is under a day, so
+  // anything older is dead weight. Pruned here rather than on the sign-in path,
+  // which should stay a couple of indexed reads.
+  const prunedSignInAttempts = await pruneSignInAttempts()
+
   return NextResponse.json({
     autoClose: await autoCloseRes.json(),
     reminders: await remindersRes.json(),
+    prunedSignInAttempts,
   })
 }
