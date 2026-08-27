@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { db } from "@/lib/db"
 import { creatorDisplayName } from "@/lib/display-name"
 import { isMultiSelect } from "@/lib/poll-logic"
+import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
 
 /**
  * The results, for the people who voted.
@@ -30,7 +31,7 @@ export default async function VoteResultsPage({ params }: { params: Promise<{ to
   const participant = await db.participant.findUnique({
     where: { token },
     include: {
-      votes: { select: { optionId: true, choice: true } },
+      votes: { select: { optionId: true, choice: true, preference: true } },
       poll: {
         include: {
           options: { include: { votes: true }, orderBy: { order: "asc" } },
@@ -56,6 +57,11 @@ export default async function VoteResultsPage({ params }: { params: Promise<{ to
     participant.votes.map((v) => v.optionId).filter((id): id is string => !!id),
   )
   const myChoice = participant.votes.find((v) => v.choice)?.choice ?? null
+  const myPreferences = new Map(
+    participant.votes
+      .filter((vote) => vote.optionId && vote.preference)
+      .map((vote) => [vote.optionId!, vote.preference!]),
+  )
   const isOpen = poll.status === "OPEN"
 
   // On a date poll a vote means "this works for me", so the denominator is
@@ -81,6 +87,13 @@ export default async function VoteResultsPage({ params }: { params: Promise<{ to
               {poll.type === "YES_NO_VETO" ? "The answer" : "Winner"}
             </p>
             <p className="text-xl font-bold text-gray-900 mt-1">{poll.winner.label}</p>
+            {poll.winner.dateValue && (
+              <p className="mt-1 text-sm text-gray-500">
+                {poll.type === "TIME_POLL" && poll.timeZone
+                  ? formatTimeSlot(poll.winner.dateValue, poll.winner.endDate, poll.timeZone)
+                  : formatDateRange(poll.winner.dateValue, poll.winner.endDate)}
+              </p>
+            )}
             {poll.winner.dateValue && (
               <a
                 href={`/api/polls/ics/${poll.id}`}
@@ -114,15 +127,32 @@ export default async function VoteResultsPage({ params }: { params: Promise<{ to
               const count = opt.votes.length
               const pct = Math.round((count / barBasis) * 100)
               const mine = myOptionIds.has(opt.id)
+              const myPreference = myPreferences.get(opt.id)
+              const ideal = opt.votes.filter((vote) => vote.preference === "IDEAL").length
               const won = poll.winnerId === opt.id
               return (
                 <div key={opt.id} className="space-y-1">
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-sm text-gray-800 min-w-0 truncate">
-                      {opt.label}
-                      {mine && <span className="ml-1.5 text-xs text-indigo-600">· your pick</span>}
+                    <span className="text-sm text-gray-800 min-w-0">
+                      <span className="block truncate">
+                        {opt.label}
+                        {mine && (
+                          <span className="ml-1.5 text-xs text-indigo-600">
+                            · {poll.type === "TIME_POLL" ? myPreference?.toLowerCase() : "your pick"}
+                          </span>
+                        )}
+                      </span>
+                      {opt.dateValue && (
+                        <span className="block text-xs text-gray-400">
+                          {poll.type === "TIME_POLL" && poll.timeZone
+                            ? formatTimeSlot(opt.dateValue, opt.endDate, poll.timeZone)
+                            : formatDateRange(opt.dateValue, opt.endDate)}
+                        </span>
+                      )}
                     </span>
-                    <span className="text-sm text-gray-500 shrink-0 tabular-nums">{count}</span>
+                    <span className="text-sm text-gray-500 shrink-0 tabular-nums">
+                      {poll.type === "TIME_POLL" ? `${count} · ${ideal} ideal` : count}
+                    </span>
                   </div>
                   <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
                     <div

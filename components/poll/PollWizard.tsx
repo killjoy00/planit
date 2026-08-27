@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { COMMON_TIME_ZONES, localDateTimeToUtc } from "@/lib/time-zones"
 
 interface GroupMember { id: string; name: string; email: string }
 interface Group { id: string; name: string; members: GroupMember[] }
@@ -12,25 +13,39 @@ interface Props {
   defaultCreatorName: string
   /** False when the guess is standing in for a name the user never set. */
   hasSavedName: boolean
+  template?: PollTemplate
 }
 
-type PollType = "DATE_POLL" | "SINGLE_CHOICE" | "YES_NO_VETO"
+type PollType = "DATE_POLL" | "TIME_POLL" | "SINGLE_CHOICE" | "YES_NO_VETO"
 interface Option { label: string; dateValue: string; endDate: string }
 interface Invitee { name: string; email: string }
 
-export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) {
+interface PollTemplate {
+  sourceTitle: string
+  title: string
+  description: string
+  type: PollType
+  timeZone: string
+  options: Option[]
+  invitees: Invitee[]
+  threshold: string
+  allowSuggestions: boolean
+  replyToCreator: boolean
+}
+
+export function PollWizard({ groups, defaultCreatorName, hasSavedName, template }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [step, setStep] = useState(1)
   const [error, setError] = useState("")
 
   // Step 1 — type
-  const [pollType, setPollType] = useState<PollType>("DATE_POLL")
+  const [pollType, setPollType] = useState<PollType>(template?.type ?? "DATE_POLL")
 
   // Step 2 — title, description, options
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [options, setOptions] = useState<Option[]>([
+  const [title, setTitle] = useState(template?.title ?? "")
+  const [description, setDescription] = useState(template?.description ?? "")
+  const [options, setOptions] = useState<Option[]>(template?.options.length ? template.options : [
     { label: "", dateValue: "", endDate: "" },
     { label: "", dateValue: "", endDate: "" },
   ])
@@ -38,15 +53,24 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
   // Step 3 — sender name, group/invitees, deadline, threshold, suggestions
   const [creatorName, setCreatorName] = useState(defaultCreatorName)
   const [groupId, setGroupId] = useState("")
-  const [extraInvitees, setExtraInvitees] = useState<Invitee[]>([])
+  const [extraInvitees, setExtraInvitees] = useState<Invitee[]>(template?.invitees ?? [])
   const [deadline, setDeadline] = useState("")
-  const [threshold, setThreshold] = useState("")
-  const [allowSuggestions, setAllowSuggestions] = useState(false)
-  const [replyToCreator, setReplyToCreator] = useState(false)
+  const [threshold, setThreshold] = useState(template?.threshold ?? "")
+  const [allowSuggestions, setAllowSuggestions] = useState(template?.allowSuggestions ?? false)
+  const [replyToCreator, setReplyToCreator] = useState(template?.replyToCreator ?? false)
+  const [timeZone, setTimeZone] = useState(template?.timeZone ?? "")
   // Counting back from the deadline only means anything when there is one, so
   // this follows the deadline field rather than sitting as a separate choice
   // the creator has to remember to revisit.
   const [remindBeforeDeadline, setRemindBeforeDeadline] = useState(true)
+
+  useEffect(() => {
+    if (timeZone) return
+    const timeout = window.setTimeout(() => {
+      setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC")
+    }, 0)
+    return () => window.clearTimeout(timeout)
+  }, [timeZone])
 
   const selectedGroup = groups.find((g) => g.id === groupId)
   const groupMembers: Invitee[] = selectedGroup?.members ?? []
@@ -81,9 +105,16 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
     setError("")
     if (step === 2) {
       if (!title.trim()) return setError("Poll title is required.")
+      if (pollType === "TIME_POLL" && !timeZone.trim()) return setError("Choose a time zone.")
       if (pollType !== "YES_NO_VETO") {
         const valid = options.filter((o) => o.label.trim())
         if (valid.length < 2) return setError("Add at least 2 options.")
+        if ((pollType === "DATE_POLL" || pollType === "TIME_POLL") && valid.some((o) => !o.dateValue)) {
+          return setError(pollType === "TIME_POLL" ? "Add a start time for every option." : "Add a date for every option.")
+        }
+        if (pollType === "TIME_POLL" && valid.some((o) => !o.endDate || o.endDate <= o.dateValue)) {
+          return setError("Every time option needs an end after its start.")
+        }
       }
     }
     if (step === 3) {
@@ -97,23 +128,42 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
     setError("")
     if (allInvitees.length === 0) return setError("Add at least one invitee.")
 
+    const requestOptions = pollType === "YES_NO_VETO"
+      ? [{ label: title.trim() }]
+      : options.filter((o) => o.label.trim()).map((o) => {
+          if (pollType === "TIME_POLL") {
+            const start = localDateTimeToUtc(o.dateValue, timeZone)
+            const end = localDateTimeToUtc(o.endDate, timeZone)
+            if (!start || !end || end <= start) return null
+            return { label: o.label.trim(), dateValue: start.toISOString(), endDate: end.toISOString() }
+          }
+          return {
+            label: o.label.trim(),
+            // Date polls represent calendar dates, not instants. Anchor them
+            // to UTC so a creator east of Greenwich cannot accidentally save
+            // the previous day when their local midnight is serialized.
+            dateValue: o.dateValue ? `${o.dateValue.slice(0, 10)}T00:00:00.000Z` : undefined,
+            endDate: o.endDate ? `${o.endDate.slice(0, 10)}T00:00:00.000Z` : undefined,
+          }
+        })
+
+    if (requestOptions.some((option) => option === null)) {
+      return setError("One of those local times does not exist in the selected time zone.")
+    }
+    const safeOptions = requestOptions.filter((option) => option !== null)
+
     const body = {
       creatorName: creatorName.trim() || undefined,
       title: title.trim(),
       description: description.trim() || undefined,
       type: pollType,
-      options: pollType === "YES_NO_VETO"
-        ? [{ label: title.trim() }]
-        : options.filter((o) => o.label.trim()).map((o) => ({
-            label: o.label.trim(),
-            dateValue: o.dateValue ? new Date(o.dateValue).toISOString() : undefined,
-            endDate: o.endDate ? new Date(o.endDate).toISOString() : undefined,
-          })),
+      options: safeOptions,
+      timeZone: pollType === "TIME_POLL" ? timeZone : undefined,
       groupId: groupId || undefined,
       invitees: allInvitees,
       deadline: deadline ? new Date(deadline).toISOString() : undefined,
       threshold: threshold ? parseInt(threshold) : undefined,
-      allowSuggestions,
+      allowSuggestions: pollType === "SINGLE_CHOICE" && allowSuggestions,
       replyToCreator,
       reminderSchedule: deadline && remindBeforeDeadline ? "BEFORE_DEADLINE" : "AFTER_SEND",
     }
@@ -138,6 +188,11 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
 
   return (
     <div className="space-y-6">
+      {template && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+          Planning again from <strong>{template.sourceTitle}</strong>. Choose a new deadline before sending.
+        </div>
+      )}
       {/* Progress */}
       <div className="flex gap-2">
         {stepLabels.map((label, i) => (
@@ -154,6 +209,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
           <p className="text-sm font-medium text-gray-700">What kind of poll?</p>
           {([
             { value: "DATE_POLL", label: "Pick a date", desc: "Choose from multiple date options" },
+            { value: "TIME_POLL", label: "Pick a time", desc: "Compare time slots with Ideal / Works / Can't availability" },
             { value: "SINGLE_CHOICE", label: "Single choice", desc: "Pick one option from a list" },
             { value: "YES_NO_VETO", label: "Yes / Fine / Hard No", desc: "Anyone can veto. Good for all-or-nothing decisions." },
           ] as const).map((t) => (
@@ -178,7 +234,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
             <label className="block text-sm font-medium text-gray-700 mb-1">Poll title</label>
             <input
               type="text"
-              placeholder={pollType === "DATE_POLL" ? "Weekend trip to the mountains?" : "Where should we eat?"}
+              placeholder={pollType === "DATE_POLL" ? "Weekend trip to the mountains?" : pollType === "TIME_POLL" ? "When should we meet?" : "Where should we eat?"}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
@@ -194,6 +250,23 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
               className="w-full rounded-lg border border-gray-300 px-4 py-2.5 resize-none focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
             />
           </div>
+          {pollType === "TIME_POLL" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Time zone</label>
+              <input
+                type="text"
+                list="planit-time-zones"
+                value={timeZone}
+                onChange={(e) => setTimeZone(e.target.value)}
+                placeholder="America/New_York"
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none"
+              />
+              <datalist id="planit-time-zones">
+                {COMMON_TIME_ZONES.map((zone) => <option key={zone} value={zone} />)}
+              </datalist>
+              <p className="mt-1 text-xs text-gray-400">Every voter sees these slots in this named zone.</p>
+            </div>
+          )}
           {pollType !== "YES_NO_VETO" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Options</label>
@@ -203,7 +276,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        placeholder={pollType === "DATE_POLL" ? "Label (e.g. Beach weekend)" : `Option ${i + 1}`}
+                        placeholder={pollType === "DATE_POLL" ? "Label (e.g. Beach weekend)" : pollType === "TIME_POLL" ? `Slot ${i + 1} label` : `Option ${i + 1}`}
                         value={opt.label}
                         onChange={(e) => updateOption(i, "label", e.target.value)}
                         className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
@@ -230,6 +303,29 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
                             value={opt.endDate ? opt.endDate.slice(0, 10) : ""}
                             min={opt.dateValue ? opt.dateValue.slice(0, 10) : undefined}
                             onChange={(e) => updateOption(i, "endDate", e.target.value ? `${e.target.value}T00:00` : "")}
+                            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {pollType === "TIME_POLL" && (
+                      <div className="grid grid-cols-2 gap-2 ml-0.5">
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-0.5">Starts</label>
+                          <input
+                            type="datetime-local"
+                            value={opt.dateValue}
+                            onChange={(e) => updateOption(i, "dateValue", e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-0.5">Ends</label>
+                          <input
+                            type="datetime-local"
+                            value={opt.endDate}
+                            min={opt.dateValue || undefined}
+                            onChange={(e) => updateOption(i, "endDate", e.target.value)}
                             className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
                           />
                         </div>
@@ -368,23 +464,25 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
                   : "Timed from when the invitations go out."}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setAllowSuggestions((v) => !v)}
-            className={`w-full flex items-center justify-between rounded-xl border-2 px-4 py-3 transition-all ${
-              allowSuggestions ? "border-indigo-500 bg-indigo-50" : "border-gray-200 bg-white hover:border-gray-300"
-            }`}
-          >
-            <div className="text-left">
-              <p className="text-sm font-medium text-gray-900">Allow participants to suggest options</p>
-              <p className="text-xs text-gray-500 mt-0.5">Anyone can add a new option while voting</p>
-            </div>
-            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
-              allowSuggestions ? "border-indigo-500 bg-indigo-500" : "border-gray-300"
-            }`}>
-              {allowSuggestions && <span className="text-white text-xs font-bold">✓</span>}
-            </div>
-          </button>
+          {pollType === "SINGLE_CHOICE" && (
+            <button
+              type="button"
+              onClick={() => setAllowSuggestions((v) => !v)}
+              className={`w-full flex items-center justify-between rounded-xl border-2 px-4 py-3 transition-all ${
+                allowSuggestions ? "border-indigo-500 bg-indigo-50" : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
+              <div className="text-left">
+                <p className="text-sm font-medium text-gray-900">Allow participants to suggest options</p>
+                <p className="text-xs text-gray-500 mt-0.5">Anyone can add a new option while voting</p>
+              </div>
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
+                allowSuggestions ? "border-indigo-500 bg-indigo-500" : "border-gray-300"
+              }`}>
+                {allowSuggestions && <span className="text-white text-xs font-bold">✓</span>}
+              </div>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setReplyToCreator((v) => !v)}
@@ -417,6 +515,9 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName }: Props) 
             <div className="flex justify-between"><span className="text-gray-500">Type</span><span className="font-medium">{pollType.replace(/_/g, " ")}</span></div>
             {pollType !== "YES_NO_VETO" && (
               <div className="flex justify-between"><span className="text-gray-500">Options</span><span className="font-medium">{options.filter((o) => o.label).length}</span></div>
+            )}
+            {pollType === "TIME_POLL" && (
+              <div className="flex justify-between"><span className="text-gray-500">Time zone</span><span className="font-medium">{timeZone}</span></div>
             )}
             <div className="flex justify-between"><span className="text-gray-500">Invitees</span><span className="font-medium">{allInvitees.length} people</span></div>
             {deadline && <div className="flex justify-between"><span className="text-gray-500">Deadline</span><span className="font-medium">{new Date(deadline).toLocaleDateString()}</span></div>}

@@ -51,7 +51,8 @@ per minute, five a day, and fifteen an hour from one source
 (`lib/signin-rate-limit.ts`). The login form is public and will mail whoever is
 typed into it — that is what a magic link is — so without this it is an open
 relay for that one message, and address-bombing campaigns find those. Attempts
-are recorded in `SignInAttempt` and pruned by the daily cron.
+are recorded in the `EmailSendAttempt` model (mapped to the existing
+`SignInAttempt` table) and pruned by the daily cron.
 
 Guide metadata lives in `lib/guides.ts` (index page, sitemap, per-page `<title>`);
 each guide's prose lives in its own route file. Adding a guide means an entry in the
@@ -82,6 +83,31 @@ bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Database migrations and deployment
+
+Production builds no longer mutate the database. A controlled deployment should
+apply committed migrations before releasing application code:
+
+```bash
+npm run deploy:build
+```
+
+Keep preview builds on `npm run build`; they must not migrate a shared database.
+
+The first migration is a baseline for databases previously managed by
+`prisma db push`. For an existing planit database, mark that baseline as
+already applied once, then run the feature migration:
+
+```bash
+npx prisma migrate resolve --applied 20260827000000_baseline
+npm run db:migrate
+```
+
+Do not resolve the baseline on a new, empty database; `prisma migrate deploy`
+will create the complete schema there. Pull requests run lint, TypeScript,
+unit tests, Prisma generation, and the production Next.js build in GitHub
+Actions.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

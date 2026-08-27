@@ -1,43 +1,21 @@
 import { headers } from "next/headers"
+import type { EmailSendPurpose, Prisma } from "@/app/generated/prisma/client"
 
 import { db } from "./db"
 
-/**
- * One address may be sent a fresh sign-in link only this often.
- *
- * The same 60 seconds the join form already uses, and for the same reason: a
- * refresh, a double-tap, or a script should not turn into a second message.
- */
 export const ADDRESS_COOLDOWN_MS = 60 * 1000
-
-/** …and only this many in a day, so a slow drip is bounded too. */
-export const ADDRESS_MAX_PER_DAY = 5
-
-/**
- * One source may trigger this many sends an hour, however many different
- * addresses it cycles through. The per-address limits alone do nothing against
- * a bomber working through a list, which is the shape this abuse actually
- * takes.
- */
-export const SOURCE_MAX_PER_HOUR = 15
+export const SIGN_IN_ADDRESS_MAX_PER_DAY = 5
+export const SIGN_IN_SOURCE_MAX_PER_HOUR = 15
+export const JOIN_ADDRESS_MAX_PER_DAY = 5
+export const JOIN_SOURCE_MAX_PER_HOUR = 30
+export const JOIN_SCOPE_MAX_PER_HOUR = 100
 
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
-
-/** Anything older than this is past every window above and can be deleted. */
 export const PRUNE_AFTER_MS = 2 * DAY_MS
 
-export type SignInRefusal = "cooldown" | "address-quota" | "source-quota"
+export type EmailSendRefusal = "cooldown" | "address-quota" | "source-quota" | "scope-quota"
 
-/**
- * The caller's address, as far as we can tell behind a proxy.
- *
- * `x-forwarded-for` is a list appended to hop by hop; the first entry is the
- * original client. It is spoofable in general, but on Vercel the platform
- * rewrites it, and a bomber who forges it still trips the per-address limits.
- * Null rather than a guess when there is no header — an absent source must not
- * collide with a real one.
- */
 export async function clientIp(): Promise<string | null> {
   try {
     const h = await headers()
@@ -45,60 +23,84 @@ export async function clientIp(): Promise<string | null> {
     if (forwarded) return forwarded.split(",")[0]?.trim() || null
     return h.get("x-real-ip")?.trim() || null
   } catch {
-    // Called outside a request scope (a script, a test). No source to attribute.
     return null
   }
 }
 
+interface ReserveEmailSendInput {
+  purpose: EmailSendPurpose
+  email: string
+  ip: string | null
+  scope?: string | null
+  now?: Date
+}
+
 /**
- * Whether we may send a sign-in link to this address now.
+ * Atomically reserve one public email send.
  *
- * Checked before Auth.js mints a token or calls the mailer, so a refusal costs
- * nothing and leaves no orphan token behind.
+ * The previous check-then-create sequence let a burst of simultaneous requests
+ * all observe the same empty window. Transaction-scoped advisory locks make the
+ * decision and its record one operation for both the address and source.
  */
-export async function refuseSignIn(
-  email: string,
-  ip: string | null,
-  now: Date = new Date(),
-): Promise<SignInRefusal | null> {
+export async function reserveEmailSend({
+  purpose,
+  email,
+  ip,
+  scope = null,
+  now = new Date(),
+}: ReserveEmailSendInput): Promise<EmailSendRefusal | null> {
   const address = email.trim().toLowerCase()
 
-  const [recent, todayCount] = await Promise.all([
-    db.signInAttempt.findFirst({
-      where: { email: address },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
-    }),
-    db.signInAttempt.count({
-      where: { email: address, createdAt: { gte: new Date(now.getTime() - DAY_MS) } },
-    }),
-  ])
+  return db.$transaction(async (tx) => {
+    const lockKeys = [
+      `${purpose}:email:${address}`,
+      ...(ip ? [`${purpose}:ip:${ip}`] : []),
+      ...(scope ? [`${purpose}:scope:${scope}`] : []),
+    ].sort()
+    for (const key of lockKeys) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`
+    }
 
-  if (recent && now.getTime() - recent.createdAt.getTime() < ADDRESS_COOLDOWN_MS) {
-    return "cooldown"
-  }
-  if (todayCount >= ADDRESS_MAX_PER_DAY) return "address-quota"
+    const [recent, addressCount, sourceCount, scopeCount] = await Promise.all([
+      tx.emailSendAttempt.findFirst({
+        where: { purpose, email: address },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+      tx.emailSendAttempt.count({
+        where: { purpose, email: address, createdAt: { gte: new Date(now.getTime() - DAY_MS) } },
+      }),
+      ip
+        ? tx.emailSendAttempt.count({
+            where: { purpose, ip, createdAt: { gte: new Date(now.getTime() - HOUR_MS) } },
+          })
+        : Promise.resolve(0),
+      scope
+        ? tx.emailSendAttempt.count({
+            where: { purpose, scope, createdAt: { gte: new Date(now.getTime() - HOUR_MS) } },
+          })
+        : Promise.resolve(0),
+    ])
 
-  if (ip) {
-    const fromSource = await db.signInAttempt.count({
-      where: { ip, createdAt: { gte: new Date(now.getTime() - HOUR_MS) } },
+    if (recent && now.getTime() - recent.createdAt.getTime() < ADDRESS_COOLDOWN_MS) {
+      return "cooldown"
+    }
+
+    const addressMax = purpose === "SIGN_IN" ? SIGN_IN_ADDRESS_MAX_PER_DAY : JOIN_ADDRESS_MAX_PER_DAY
+    const sourceMax = purpose === "SIGN_IN" ? SIGN_IN_SOURCE_MAX_PER_HOUR : JOIN_SOURCE_MAX_PER_HOUR
+    if (addressCount >= addressMax) return "address-quota"
+    if (sourceCount >= sourceMax) return "source-quota"
+    if (purpose === "JOIN" && scopeCount >= JOIN_SCOPE_MAX_PER_HOUR) return "scope-quota"
+
+    await tx.emailSendAttempt.create({
+      data: { purpose, email: address, ip, scope },
     })
-    if (fromSource >= SOURCE_MAX_PER_HOUR) return "source-quota"
-  }
-
-  return null
+    return null
+  }, { isolationLevel: "Serializable" as Prisma.TransactionIsolationLevel })
 }
 
-/** Record a send, so the limits above can see it. */
-export async function recordSignInAttempt(email: string, ip: string | null): Promise<void> {
-  await db.signInAttempt.create({
-    data: { email: email.trim().toLowerCase(), ip },
-  })
-}
-
-/** Drop rows past every window. Called from the daily cron. */
-export async function pruneSignInAttempts(now: Date = new Date()): Promise<number> {
-  const { count } = await db.signInAttempt.deleteMany({
+export async function pruneEmailSendAttempts(now: Date = new Date()): Promise<number> {
+  const { count } = await db.emailSendAttempt.deleteMany({
     where: { createdAt: { lt: new Date(now.getTime() - PRUNE_AFTER_MS) } },
   })
   return count

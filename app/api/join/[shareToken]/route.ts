@@ -4,6 +4,8 @@ import { z } from "zod"
 import { sendJoinVerification } from "@/lib/email"
 import { creatorDisplayName } from "@/lib/display-name"
 import { appUrl } from "@/lib/site"
+import { MAX_INVITEES_PER_POLL } from "@/lib/limits"
+import { clientIp, reserveEmailSend } from "@/lib/signin-rate-limit"
 
 const schema = z.object({
   // Trimmed before validating, not after: a pasted address routinely carries
@@ -12,9 +14,6 @@ const schema = z.object({
   name: z.string().trim().min(1).max(80),
   email: z.string().trim().toLowerCase().max(200).pipe(z.email()),
 })
-
-/** A share link is public, so a poll cannot grow without bound through it. */
-const MAX_PEOPLE_PER_POLL = 300
 
 /** How long a verification link stays good. */
 const EXPIRY_MS = 24 * 60 * 60 * 1000
@@ -38,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sha
     return NextResponse.json({ error: "This poll is closed." }, { status: 400 })
   }
 
-  const body = await req.json()
+  const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: "Please enter your name and a valid email." }, { status: 400 })
@@ -62,14 +61,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sha
     })
   }
 
-  const [participantCount, pendingCount] = await Promise.all([
-    db.participant.count({ where: { pollId: poll.id } }),
-    db.joinRequest.count({ where: { pollId: poll.id } }),
-  ])
-  if (participantCount + pendingCount >= MAX_PEOPLE_PER_POLL) {
-    return NextResponse.json({ error: "This poll is full." }, { status: 400 })
-  }
-
   const now = new Date()
   const pending = await db.joinRequest.findUnique({
     where: { pollId_email: { pollId: poll.id, email } },
@@ -80,11 +71,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sha
     return NextResponse.json({ status: "sent", email })
   }
 
-  const request = await db.joinRequest.upsert({
-    where: { pollId_email: { pollId: poll.id, email } },
-    create: { pollId: poll.id, name, email, expires: new Date(now.getTime() + EXPIRY_MS) },
-    update: { name, expires: new Date(now.getTime() + EXPIRY_MS), lastSentAt: now },
+  const ip = await clientIp()
+  const refusal = await reserveEmailSend({
+    purpose: "JOIN",
+    email,
+    ip,
+    scope: shareToken,
+    now,
   })
+  if (refusal) {
+    return NextResponse.json(
+      { error: "A confirmation was just sent, or this link has sent too many recently. Try again later." },
+      { status: 429 },
+    )
+  }
+
+  const request = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`poll-join:${poll.id}`}))`
+    const [participantCount, otherPendingCount] = await Promise.all([
+      tx.participant.count({ where: { pollId: poll.id } }),
+      tx.joinRequest.count({ where: { pollId: poll.id, email: { not: email } } }),
+    ])
+    if (participantCount + otherPendingCount >= MAX_INVITEES_PER_POLL) return null
+    return tx.joinRequest.upsert({
+      where: { pollId_email: { pollId: poll.id, email } },
+      create: { pollId: poll.id, name, email, expires: new Date(now.getTime() + EXPIRY_MS) },
+      update: { name, expires: new Date(now.getTime() + EXPIRY_MS), lastSentAt: now },
+    })
+  })
+  if (!request) return NextResponse.json({ error: "This poll is full." }, { status: 400 })
 
   const delivery = await sendJoinVerification({
     participantName: name,

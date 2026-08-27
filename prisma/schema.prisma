@@ -90,6 +90,9 @@ model Poll {
   title          String
   description    String?       @db.Text
   type           PollType
+  /// IANA zone used to present TIME_POLL options consistently to every voter.
+  /// Date-only polls remain zone-free and are rendered as UTC calendar dates.
+  timeZone       String?
   status         PollStatus    @default(OPEN)
   creatorId      String
   creator        User          @relation(fields: [creatorId], references: [id], onDelete: Cascade)
@@ -125,6 +128,7 @@ model Poll {
 
 enum PollType {
   DATE_POLL
+  TIME_POLL
   SINGLE_CHOICE
   YES_NO_VETO
 }
@@ -179,6 +183,10 @@ model Participant {
   // means it has not been attempted; `inviteError` set means it was refused.
   inviteSentAt DateTime?
   inviteError  String?   @db.Text
+  /// Delivery of the final result. A failed result stays retryable from the
+  /// creator's poll page instead of disappearing into a server log.
+  resultSentAt DateTime?
+  resultError  String?   @db.Text
   votes     Vote[]
   createdAt DateTime  @default(now())
 
@@ -200,6 +208,9 @@ model Vote {
   optionId      String?
   option        PollOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
   choice        VoteChoice?
+  /// TIME_POLL ballots grade each selected slot. A missing row means the slot
+  /// does not work for that participant.
+  preference    VotePreference?
   createdAt     DateTime    @default(now())
 
   @@unique([participantId, optionId])
@@ -209,6 +220,11 @@ enum VoteChoice {
   YES
   FINE
   NO
+}
+
+enum VotePreference {
+  IDEAL
+  AVAILABLE
 }
 
 // ── Self-service joins ───────────────────────────────────────────────────────
@@ -249,17 +265,28 @@ model JoinRequest {
 ///
 /// Deliberately not tied to `User`: most of these are addresses that have no
 /// account and never will. Rows are disposable and pruned by the daily cron.
-model SignInAttempt {
+model EmailSendAttempt {
   id        String   @id @default(cuid())
+  purpose   EmailSendPurpose @default(SIGN_IN)
   /// Always stored lowercased, as Auth.js normalises the address before this.
   email     String
   /// Best-effort client address, for capping one source that cycles addresses.
   /// Null when no forwarding header was present.
   ip        String?
+  /// Optional public-link or account scope. This keeps one shared link or
+  /// account from cycling through addresses without bound.
+  scope     String?
   createdAt DateTime @default(now())
 
-  @@index([email, createdAt])
-  @@index([ip, createdAt])
+  @@index([purpose, email, createdAt])
+  @@index([purpose, ip, createdAt])
+  @@index([purpose, scope, createdAt])
+  @@map("SignInAttempt")
+}
+
+enum EmailSendPurpose {
+  SIGN_IN
+  JOIN
 }
 
 // ── Suppression ──────────────────────────────────────────────────────────────

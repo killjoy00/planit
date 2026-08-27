@@ -2,12 +2,14 @@ import { db } from "./db"
 import { sendInviteEmails, type DeliveryResult, type InviteEmailProps } from "./email"
 import { creatorDisplayName } from "./display-name"
 import { appUrl } from "./site"
+import { formatDateRange, formatTimeSlot } from "./time-zones"
 
 interface InvitePoll {
   id: string
   title: string
   description: string | null
   type: string
+  timeZone: string | null
   deadline: Date | null
   replyToCreator: boolean
   options: Array<{ label: string; dateValue: Date | null; endDate: Date | null }>
@@ -16,26 +18,16 @@ interface InvitePoll {
 
 type InviteParticipant = { name: string; email: string; token: string }
 
-function formatDateRange(start: Date | null, end: Date | null): string | undefined {
-  if (!start) return undefined
-  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  if (!end) {
-    return start.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-  }
-  return `${fmt(start)} – ${fmt(end)}, ${end.getFullYear()}`
-}
-
 function inviteProps(poll: InvitePoll, participants: InviteParticipant[]): InviteEmailProps[] {
   const base = appUrl()
   const creatorName = creatorDisplayName(poll.creator)
   const options = poll.options.map((o) => ({
     label: o.label,
-    dateStr: formatDateRange(o.dateValue, o.endDate),
+    dateStr: o.dateValue
+      ? poll.type === "TIME_POLL" && poll.timeZone
+        ? formatTimeSlot(o.dateValue, o.endDate, poll.timeZone)
+        : formatDateRange(o.dateValue, o.endDate)
+      : undefined,
   }))
 
   const replyTo = poll.replyToCreator ? poll.creator.email ?? undefined : undefined

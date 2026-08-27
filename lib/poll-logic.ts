@@ -1,5 +1,6 @@
 import type { Poll, PollOption, Participant, Vote } from "@/app/generated/prisma/client"
 import { VoteChoice } from "@/app/generated/prisma/enums"
+import { selectTimePollWinner } from "./time-poll"
 
 type PollForWinner = Pick<Poll, "type"> & {
   options: PollOption[]
@@ -14,7 +15,7 @@ type PollForWinner = Pick<Poll, "type"> & {
  * types ask for a single decision.
  */
 export function isMultiSelect(type: Poll["type"]): boolean {
-  return type === "DATE_POLL"
+  return type === "DATE_POLL" || type === "TIME_POLL"
 }
 
 export function getUnvotedParticipants(
@@ -34,6 +35,10 @@ export function determineWinner(poll: PollForWinner): PollOption | null {
     if (noCount > 0) return null
     if (yesFineCount > 0) return options[0] ?? null
     return null
+  }
+
+  if (type === "TIME_POLL") {
+    return selectTimePollWinner(options, votes)
   }
 
   // DATE_POLL and SINGLE_CHOICE: the option with the most votes wins. On a date

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { checkThreshold, isMultiSelect } from "@/lib/poll-logic"
 import { CLOSABLE_POLL_INCLUDE, closePollAndAnnounce } from "@/lib/close-poll"
+import { MAX_OPTIONS_PER_POLL } from "@/lib/limits"
 
 const schema = z.object({
   /** Selections for a choice poll. A date poll may send several. */
@@ -10,6 +11,11 @@ const schema = z.object({
   /** Single-selection form of `optionIds`, still sent by older open tabs. */
   optionId: z.string().optional(),
   choice: z.enum(["YES", "FINE", "NO"]).optional(),
+  /** TIME_POLL slots can be ideal or merely workable. Omitted means unavailable. */
+  preferences: z.array(z.object({
+    optionId: z.string(),
+    preference: z.enum(["IDEAL", "AVAILABLE"]),
+  })).max(MAX_OPTIONS_PER_POLL).optional(),
 })
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -43,9 +49,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const selectedIds = [
     ...new Set(parsed.data.optionIds ?? (parsed.data.optionId ? [parsed.data.optionId] : [])),
   ]
+  const preferences = [...new Map(
+    (parsed.data.preferences ?? []).map((item) => [item.optionId, item]),
+  ).values()]
 
   if (poll.type === "YES_NO_VETO") {
     if (!choice) return NextResponse.json({ error: "Choice required" }, { status: 400 })
+  } else if (poll.type === "TIME_POLL") {
+    if (preferences.length === 0) {
+      return NextResponse.json({ error: "Mark at least one time as ideal or workable." }, { status: 400 })
+    }
+    const validIds = new Set(poll.options.map((o) => o.id))
+    if (preferences.some(({ optionId }) => !validIds.has(optionId))) {
+      return NextResponse.json({ error: "Unknown option." }, { status: 400 })
+    }
   } else {
     if (selectedIds.length === 0) {
       return NextResponse.json(
@@ -81,11 +98,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
               optionId: null,
               choice: choice ?? null,
             }]
+          : poll.type === "TIME_POLL"
+            ? preferences.map(({ optionId, preference }) => ({
+                participantId: participant.id,
+                pollId: participant.pollId,
+                optionId,
+                choice: null,
+                preference,
+              }))
           : selectedIds.map((id) => ({
               participantId: participant.id,
               pollId: participant.pollId,
               optionId: id,
               choice: null,
+              preference: null,
             })),
     }),
     db.participant.update({

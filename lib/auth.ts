@@ -5,7 +5,7 @@ import { Resend as ResendClient } from "resend"
 import { render } from "@react-email/render"
 import { db } from "./db"
 import { buildConfirmUrl, verificationSecret } from "./magic-link"
-import { clientIp, recordSignInAttempt, refuseSignIn } from "./signin-rate-limit"
+import { clientIp, reserveEmailSend } from "./signin-rate-limit"
 import { authConfig } from "@/auth.config"
 import MagicLinkEmail from "@/emails/magic-link"
 
@@ -14,7 +14,7 @@ const FROM = process.env.EMAIL_FROM ?? "planit <noreply@example.com>"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  adapter: PrismaAdapter(db as any),
+  adapter: PrismaAdapter(db as unknown as Parameters<typeof PrismaAdapter>[0]),
   providers: [
     Resend({
       apiKey: process.env.RESEND_API_KEY,
@@ -80,13 +80,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!address) return false
 
       const ip = await clientIp()
-      const refusal = await refuseSignIn(address, ip)
+      const refusal = await reserveEmailSend({ purpose: "SIGN_IN", email: address, ip })
       if (refusal) {
         console.warn(`[signin] refused ${refusal} for ${address}${ip ? ` from ${ip}` : ""}`)
         return false
       }
 
-      await recordSignInAttempt(address, ip)
       return true
     },
     session({ session, user }) {

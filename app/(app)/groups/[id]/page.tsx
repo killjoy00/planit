@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 import { GroupEditor } from "@/components/group/GroupEditor"
 
 export default async function GroupPage({ params }: { params: Promise<{ id: string }> }) {

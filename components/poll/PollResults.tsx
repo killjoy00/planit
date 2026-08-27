@@ -1,14 +1,17 @@
 "use client"
 
 import { useState, useEffect, useCallback, useTransition } from "react"
+import { useRouter } from "next/navigation"
+import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
 
-interface Option { id: string; label: string; dateValue: string | null; endDate: string | null; suggestedByName: string | null; voteCount: number }
+interface Option { id: string; label: string; dateValue: string | null; endDate: string | null; suggestedByName: string | null; voteCount: number; idealCount: number }
 interface Participant {
   id: string; name: string; email: string
-  voted: boolean; optedOut: boolean; inviteDelivered: boolean
+  voted: boolean; optedOut: boolean; inviteDelivered: boolean; resultDelivered: boolean
   /** Every option this person picked. Date polls allow more than one. */
   optionIds: string[]
   choice: string | null
+  preferences: Array<{ optionId: string; preference: "IDEAL" | "AVAILABLE" }>
 }
 interface Winner { id: string; label: string; dateValue: string | null; endDate: string | null }
 
@@ -24,35 +27,40 @@ interface Props {
   pollId: string
   initialData: ResultsData
   pollType: string
-  pollTitle: string
   icsAvailable: boolean
   pollIdForIcs: string
   /** Public link the creator can hand out themselves. */
   shareUrl: string
-}
-
-function formatDateRange(start: string | null, end: string | null): string | null {
-  if (!start) return null
-  const s = new Date(start)
-  if (!end) return s.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
-  const e = new Date(end)
-  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "long", day: "numeric" })
-  return `${fmt(s)} – ${fmt(e)}, ${e.getFullYear()}`
+  timeZone: string | null
 }
 
 // Hydrate vote counts from participants. One participant can contribute to
 // several options on a date poll, but only once to any single option.
 function hydrated(d: ResultsData): ResultsData {
   const counts = new Map<string, number>()
+  const ideals = new Map<string, number>()
   for (const p of d.participants) {
     for (const optionId of new Set(p.optionIds)) {
       counts.set(optionId, (counts.get(optionId) ?? 0) + 1)
     }
+    for (const preference of p.preferences) {
+      if (preference.preference === "IDEAL") {
+        ideals.set(preference.optionId, (ideals.get(preference.optionId) ?? 0) + 1)
+      }
+    }
   }
-  return { ...d, options: d.options.map((o) => ({ ...o, voteCount: counts.get(o.id) ?? 0 })) }
+  return {
+    ...d,
+    options: d.options.map((o) => ({
+      ...o,
+      voteCount: counts.get(o.id) ?? 0,
+      idealCount: ideals.get(o.id) ?? 0,
+    })),
+  }
 }
 
-export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvailable: initialIcsAvailable, pollIdForIcs, shareUrl }: Props) {
+export function PollResults({ pollId, initialData, pollType, icsAvailable: initialIcsAvailable, pollIdForIcs, shareUrl, timeZone }: Props) {
+  const router = useRouter()
   const [data, setData] = useState(initialData)
   const [isClosing, startClose] = useTransition()
   const [showAddInvite, setShowAddInvite] = useState(false)
@@ -63,7 +71,10 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
   const [addSuccess, setAddSuccess] = useState("")
   const [isResending, setIsResending] = useState(false)
   const [resendNote, setResendNote] = useState("")
+  const [isResendingResults, setIsResendingResults] = useState(false)
+  const [resultNote, setResultNote] = useState("")
   const [copied, setCopied] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     const fresh = await fetch(`/api/polls/${pollId}/results`)
@@ -127,6 +138,25 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
     }
   }
 
+  async function handleResendResults() {
+    setIsResendingResults(true)
+    setResultNote("")
+    try {
+      const res = await fetch(`/api/polls/${pollId}/resend-results`, { method: "POST" })
+      const body = await res.json()
+      if (!res.ok) {
+        setResultNote(typeof body.error === "string" ? body.error : "Could not resend results.")
+        return
+      }
+      setResultNote(`Sent ${body.sent} result${body.sent === 1 ? "" : "s"}${body.failed.length ? `; ${body.failed.length} still failed.` : "."}`)
+      await refresh()
+    } catch {
+      setResultNote("Something went wrong.")
+    } finally {
+      setIsResendingResults(false)
+    }
+  }
+
   useEffect(() => {
     if (data.status !== "OPEN") return
     const iv = setInterval(refresh, 10000)
@@ -137,13 +167,31 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
   const voted = h.participants.filter((p) => p.voted && !p.optedOut).length
   const total = h.participants.filter((p) => !p.optedOut).length
   const undelivered = h.participants.filter((p) => !p.inviteDelivered && !p.optedOut)
+  const undeliveredResults = h.participants.filter((p) => !p.resultDelivered && !p.optedOut)
   const maxVotes = Math.max(...h.options.map((o) => o.voteCount), 1)
 
   async function handleClose() {
     startClose(async () => {
       const res = await fetch(`/api/polls/${pollId}/close`, { method: "POST" })
-      if (res.ok) await refresh()
+      if (res.ok) {
+        await refresh()
+        router.refresh()
+      }
     })
+  }
+
+  async function handleRemoveParticipant(participant: Participant) {
+    if (!window.confirm(`Remove ${participant.name} from this poll? Their votes will also be removed.`)) return
+    setRemovingId(participant.id)
+    try {
+      const response = await fetch(`/api/polls/${pollId}/participants?participantId=${encodeURIComponent(participant.id)}`, { method: "DELETE" })
+      if (response.ok) {
+        await refresh()
+        router.refresh()
+      }
+    } finally {
+      setRemovingId(null)
+    }
   }
 
   return (
@@ -152,8 +200,12 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
         <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-6 text-center">
           <p className="text-sm font-semibold text-indigo-600 uppercase tracking-wide">Winner</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{h.winner.label}</p>
-          {formatDateRange(h.winner.dateValue, h.winner.endDate) && (
-            <p className="text-gray-500 mt-1">{formatDateRange(h.winner.dateValue, h.winner.endDate)}</p>
+          {h.winner.dateValue && (
+            <p className="text-gray-500 mt-1">
+              {pollType === "TIME_POLL" && timeZone
+                ? formatTimeSlot(h.winner.dateValue, h.winner.endDate, timeZone)
+                : formatDateRange(h.winner.dateValue, h.winner.endDate)}
+            </p>
           )}
           {(initialIcsAvailable || h.winner.dateValue) && (
             <a
@@ -163,6 +215,22 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
               Add to calendar (.ics)
             </a>
           )}
+        </div>
+      )}
+
+      {h.status === "CLOSED" && h.winner && undeliveredResults.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
+          <p className="text-amber-800">
+            {undeliveredResults.length} result email{undeliveredResults.length === 1 ? "" : "s"} still need delivery.
+          </p>
+          <button
+            onClick={handleResendResults}
+            disabled={isResendingResults}
+            className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            {isResendingResults ? "Resending…" : "Retry failed results"}
+          </button>
+          {resultNote && <p className="mt-2 text-xs text-amber-700">{resultNote}</p>}
         </div>
       )}
 
@@ -217,7 +285,11 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
         {pollType !== "YES_NO_VETO" ? (
           <div className="space-y-3">
             {h.options.map((opt) => {
-              const dateStr = formatDateRange(opt.dateValue, opt.endDate)
+              const dateStr = opt.dateValue
+                ? pollType === "TIME_POLL" && timeZone
+                  ? formatTimeSlot(opt.dateValue, opt.endDate, timeZone)
+                  : formatDateRange(opt.dateValue, opt.endDate)
+                : null
               return (
                 <div key={opt.id} className="flex items-center gap-3">
                   <div className="flex-1">
@@ -230,7 +302,11 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
                           </span>
                         )}
                       </span>
-                      <span className="text-gray-500">{opt.voteCount}</span>
+                      <span className="text-gray-500">
+                        {pollType === "TIME_POLL"
+                          ? `${opt.voteCount} available · ${opt.idealCount} ideal`
+                          : opt.voteCount}
+                      </span>
                     </div>
                     {dateStr && <p className="text-xs text-gray-400 mb-1">{dateStr}</p>}
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -339,17 +415,29 @@ export function PollResults({ pollId, initialData, pollType, pollTitle, icsAvail
                     </span>
                   )}
                 </div>
-                <span className={`text-xs shrink-0 ${
-                  p.optedOut ? "text-gray-400"
-                    : p.voted ? "text-green-600"
-                    : p.inviteDelivered ? "text-amber-500"
-                    : "text-red-600"
-                }`}>
-                  {p.optedOut ? "Opted out"
-                    : p.voted ? "Voted"
-                    : p.inviteDelivered ? "Pending"
-                    : "Not delivered"}
-                </span>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className={`text-xs ${
+                    p.optedOut ? "text-gray-400"
+                      : p.voted ? "text-green-600"
+                      : p.inviteDelivered ? "text-amber-500"
+                      : "text-red-600"
+                  }`}>
+                    {p.optedOut ? "Opted out"
+                      : p.voted ? "Voted"
+                      : p.inviteDelivered ? "Pending"
+                      : "Not delivered"}
+                  </span>
+                  {h.status === "OPEN" && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveParticipant(p)}
+                      disabled={removingId === p.id}
+                      className="text-xs text-red-500 hover:underline disabled:opacity-50"
+                    >
+                      {removingId === p.id ? "Removing…" : "Remove"}
+                    </button>
+                  )}
+                </div>
               </div>
             )
           })}

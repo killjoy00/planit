@@ -34,6 +34,62 @@ export interface CloseOutcome {
 
 const NOTHING_SENT: DeliveryResult = { sent: [], failed: [], suppressed: [] }
 
+export async function deliverPollResults(
+  poll: ClosablePoll,
+  participants: Participant[],
+  source: string,
+): Promise<DeliveryResult> {
+  const winner = determineWinner(poll)
+  if (!winner || participants.length === 0) return NOTHING_SENT
+
+  const base = appUrl()
+  const creatorName = creatorDisplayName(poll.creator)
+  const replyTo = poll.replyToCreator ? poll.creator.email ?? undefined : undefined
+  const delivery = await sendWinnerEmails(
+    participants
+      .filter((participant) => !participant.optedOut)
+      .map((participant) => ({
+        participantName: participant.name,
+        participantEmail: participant.email,
+        creatorName,
+        pollTitle: poll.title,
+        winnerLabel: winner.label,
+        resultsUrl: `${base}/vote/${participant.token}/results`,
+        icsUrl: winner.dateValue ? `${base}/api/polls/ics/${poll.id}` : undefined,
+        unsubscribeUrl: `${base}/api/unsubscribe/${participant.token}`,
+        replyTo,
+      })),
+  )
+
+  const deliveryWrites = [
+    ...(delivery.sent.length > 0
+      ? [db.participant.updateMany({
+          where: { pollId: poll.id, email: { in: delivery.sent } },
+          data: { resultSentAt: new Date(), resultError: null },
+        })]
+      : []),
+    ...delivery.failed.map((failure) => db.participant.updateMany({
+      where: { pollId: poll.id, email: failure.email },
+      data: { resultSentAt: null, resultError: failure.reason },
+    })),
+    ...(delivery.suppressed.length > 0
+      ? [db.participant.updateMany({
+          where: { pollId: poll.id, email: { in: delivery.suppressed } },
+          data: { resultSentAt: null, resultError: "Unsubscribed from planit email", optedOut: true },
+        })]
+      : []),
+  ]
+  if (deliveryWrites.length > 0) await db.$transaction(deliveryWrites)
+
+  if (delivery.failed.length > 0) {
+    console.error(
+      `[${source}] poll ${poll.id}: result refused for ${delivery.failed.length} participants`,
+      delivery.failed,
+    )
+  }
+  return delivery
+}
+
 /**
  * Close a poll and mail everyone the result.
  *
@@ -64,35 +120,7 @@ export async function closePollAndAnnounce(
 
   if (!winner) return { closed: true, winner: null, delivery: NOTHING_SENT }
 
-  const base = appUrl()
-  const creatorName = creatorDisplayName(poll.creator)
-  const replyTo = poll.replyToCreator ? poll.creator.email ?? undefined : undefined
-
-  const delivery = await sendWinnerEmails(
-    poll.participants
-      .filter((p) => !p.optedOut)
-      .map((p) => ({
-        participantName: p.name,
-        participantEmail: p.email,
-        creatorName,
-        pollTitle: poll.title,
-        winnerLabel: winner.label,
-        // Per-participant, not `/polls/{id}`: that is the creator's dashboard
-        // behind a session and an ownership check, so for everyone receiving
-        // this email it was a redirect to sign-in and then a 404.
-        resultsUrl: `${base}/vote/${p.token}/results`,
-        icsUrl: winner.dateValue ? `${base}/api/polls/ics/${poll.id}` : undefined,
-        unsubscribeUrl: `${base}/api/unsubscribe/${p.token}`,
-        replyTo,
-      })),
-  )
-
-  if (delivery.failed.length > 0) {
-    console.error(
-      `[${source}] poll ${poll.id}: result refused for ${delivery.failed.length} participants`,
-      delivery.failed,
-    )
-  }
+  const delivery = await deliverPollResults(poll, poll.participants, source)
 
   return { closed: true, winner, delivery }
 }

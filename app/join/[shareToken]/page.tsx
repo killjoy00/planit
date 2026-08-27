@@ -2,6 +2,7 @@ import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
 import { JoinForm } from "@/components/join/JoinForm"
 import { creatorDisplayName } from "@/lib/display-name"
+import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
 
 export default async function JoinPage({ params }: { params: Promise<{ shareToken: string }> }) {
   const { shareToken } = await params
@@ -54,6 +55,13 @@ export default async function JoinPage({ params }: { params: Promise<{ shareToke
             {poll.options.slice(0, 5).map((o) => (
               <p key={o.id} className="text-sm text-gray-700">
                 • {o.label}
+                {o.dateValue && (
+                  <span className="ml-1 text-gray-400">
+                    ({poll.type === "TIME_POLL" && poll.timeZone
+                      ? formatTimeSlot(o.dateValue, o.endDate, poll.timeZone)
+                      : formatDateRange(o.dateValue, o.endDate)})
+                  </span>
+                )}
               </p>
             ))}
             {poll.options.length > 5 && (
