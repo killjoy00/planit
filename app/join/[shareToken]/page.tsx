@@ -70,7 +70,7 @@ export default async function JoinPage({ params }: { params: Promise<{ shareToke
           </div>
         )}
 
-        <JoinForm shareToken={shareToken} pollTitle={poll.title} />
+        <JoinForm shareToken={shareToken} />
       </div>
     </main>
   )

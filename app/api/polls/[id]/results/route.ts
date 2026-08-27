@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
+import { appUrl } from "@/lib/site"
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -35,6 +36,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     })),
     participants: poll.participants.map((p) => ({
       id: p.id, name: p.name, email: p.email,
+      voteUrl: `${appUrl()}/vote/${p.token}`,
       voted: !!p.votedAt, optedOut: p.optedOut,
       inviteDelivered: !!p.inviteSentAt,
       resultDelivered: !!p.resultSentAt,
