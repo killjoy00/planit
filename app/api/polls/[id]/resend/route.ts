@@ -7,8 +7,8 @@ import { deliverInvites } from "@/lib/invites"
  * Re-send the invitation to everyone the mail provider never accepted.
  *
  * A refused invitation leaves the participant on the poll with nothing in
- * their inbox, and there is no other way for them to reach their vote link —
- * the token only ever travels by email. This is the creator's way out.
+ * their inbox. The creator can also copy a personal vote link from the poll,
+ * but retrying here remains useful when email is the preferred channel.
  */
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()

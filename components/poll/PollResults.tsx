@@ -7,6 +7,7 @@ import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
 interface Option { id: string; label: string; dateValue: string | null; endDate: string | null; suggestedByName: string | null; voteCount: number; idealCount: number }
 interface Participant {
   id: string; name: string; email: string
+  voteUrl: string
   voted: boolean; optedOut: boolean; inviteDelivered: boolean; resultDelivered: boolean
   /** Every option this person picked. Date polls allow more than one. */
   optionIds: string[]
@@ -74,6 +75,7 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
   const [isResendingResults, setIsResendingResults] = useState(false)
   const [resultNote, setResultNote] = useState("")
   const [copied, setCopied] = useState(false)
+  const [copiedParticipantId, setCopiedParticipantId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
@@ -237,10 +239,10 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
       {h.status === "OPEN" && (
         <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
           <div>
-            <p className="text-sm font-medium text-gray-700">Share this poll yourself</p>
+            <p className="text-sm font-medium text-gray-700">Public join link</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              Anyone with this link can join by confirming their email — useful for a group
-              chat, and it skips the inbox entirely.
+              New people can request access with this link after confirming their email.
+              To send an invited person straight to their ballot, copy their personal link below.
             </p>
           </div>
           <div className="flex gap-2">
@@ -354,8 +356,8 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
               {undelivered.length === 1
                 ? "1 invitation never reached its recipient"
                 : `${undelivered.length} invitations never reached their recipients`}
-              : {undelivered.map((p) => p.email).join(", ")}. They cannot vote until
-              the invitation arrives — the vote link only travels by email.
+              : {undelivered.map((p) => p.email).join(", ")}. Retry the email or send
+              their personal voting link directly from the participant list below.
             </p>
             {h.status === "OPEN" && (
               <button
@@ -408,14 +410,17 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
             return (
               <div key={p.id} className="flex items-start justify-between gap-3 py-1.5 text-sm">
                 <div className="min-w-0">
-                  <span className={`font-medium ${p.optedOut ? "text-gray-400 line-through" : "text-gray-800"}`}>{p.name}</span>
-                  {pickedLabels.length > 0 && pollType !== "YES_NO_VETO" && (
-                    <span className="ml-2 text-xs text-indigo-500">
-                      {shown.join(", ")}{extra > 0 && ` +${extra} more`}
-                    </span>
-                  )}
+                  <div>
+                    <span className={`font-medium ${p.optedOut ? "text-gray-400 line-through" : "text-gray-800"}`}>{p.name}</span>
+                    {pickedLabels.length > 0 && pollType !== "YES_NO_VETO" && (
+                      <span className="ml-2 text-xs text-indigo-500">
+                        {shown.join(", ")}{extra > 0 && ` +${extra} more`}
+                      </span>
+                    )}
+                  </div>
+                  <p className="truncate text-xs text-gray-400">{p.email}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
                   <span className={`text-xs ${
                     p.optedOut ? "text-gray-400"
                       : p.voted ? "text-green-600"
@@ -428,14 +433,33 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
                       : "Not delivered"}
                   </span>
                   {h.status === "OPEN" && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveParticipant(p)}
-                      disabled={removingId === p.id}
-                      className="text-xs text-red-500 hover:underline disabled:opacity-50"
-                    >
-                      {removingId === p.id ? "Removing…" : "Remove"}
-                    </button>
+                    <>
+                      {!p.optedOut && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(p.voteUrl)
+                              setCopiedParticipantId(p.id)
+                              setTimeout(() => setCopiedParticipantId(null), 2000)
+                            } catch {
+                              window.prompt("Copy this personal voting link:", p.voteUrl)
+                            }
+                          }}
+                          className="text-xs text-indigo-600 hover:underline"
+                        >
+                          {copiedParticipantId === p.id ? "Copied" : "Copy vote link"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveParticipant(p)}
+                        disabled={removingId === p.id}
+                        className="text-xs text-red-500 hover:underline disabled:opacity-50"
+                      >
+                        {removingId === p.id ? "Removing…" : "Remove"}
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

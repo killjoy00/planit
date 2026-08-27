@@ -81,6 +81,7 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
           })),
           participants: poll.participants.map((p) => ({
             id: p.id, name: p.name, email: p.email,
+            voteUrl: `${appUrl()}/vote/${p.token}`,
             voted: !!p.votedAt, optedOut: p.optedOut,
             inviteDelivered: !!p.inviteSentAt,
             resultDelivered: !!p.resultSentAt,

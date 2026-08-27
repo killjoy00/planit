@@ -4,15 +4,14 @@ import { useState } from "react"
 
 interface Props {
   shareToken: string
-  pollTitle: string
 }
 
-export function JoinForm({ shareToken, pollTitle }: Props) {
+export function JoinForm({ shareToken }: Props) {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState("")
-  const [status, setStatus] = useState<null | "sent" | "already_invited" | "already_voted">(null)
+  const [status, setStatus] = useState<null | "sent" | "resent">(null)
   const [sentTo, setSentTo] = useState("")
 
   async function handleSubmit(e: React.FormEvent) {
@@ -43,26 +42,14 @@ export function JoinForm({ shareToken, pollTitle }: Props) {
     }
   }
 
-  if (status === "already_voted") {
+  if (status === "resent") {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center space-y-2">
-        <p className="text-3xl">✅</p>
-        <h2 className="font-semibold text-gray-900">You&apos;ve already voted</h2>
+      <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-6 text-center space-y-2">
+        <p className="text-3xl">📨</p>
+        <h2 className="font-semibold text-gray-900">Fresh voting link sent</h2>
         <p className="text-sm text-gray-600">
-          <strong>{sentTo}</strong> has a vote counted on {pollTitle}.
-        </p>
-      </div>
-    )
-  }
-
-  if (status === "already_invited") {
-    return (
-      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center space-y-2">
-        <p className="text-3xl">📬</p>
-        <h2 className="font-semibold text-gray-900">You&apos;re already on this poll</h2>
-        <p className="text-sm text-gray-600">
-          An invitation went to <strong>{sentTo}</strong>. Use the link in that email to vote —
-          it&apos;s personal to you, so we can&apos;t show it here.
+          You were already invited, so we sent a new copy of your personal voting link to{" "}
+          <strong>{sentTo}</strong>. The organizer can also send that link to you directly.
         </p>
       </div>
     )

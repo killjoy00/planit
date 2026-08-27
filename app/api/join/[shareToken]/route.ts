@@ -6,6 +6,7 @@ import { creatorDisplayName } from "@/lib/display-name"
 import { appUrl } from "@/lib/site"
 import { MAX_INVITEES_PER_POLL } from "@/lib/limits"
 import { clientIp, reserveEmailSend } from "@/lib/signin-rate-limit"
+import { deliverInvites } from "@/lib/invites"
 
 const schema = z.object({
   // Trimmed before validating, not after: a pasted address routinely carries
@@ -30,7 +31,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sha
 
   const poll = await db.poll.findUnique({
     where: { shareToken },
-    include: { creator: { select: { name: true, email: true } } },
+    include: {
+      creator: { select: { name: true, email: true } },
+      options: true,
+    },
   })
   if (!poll) return NextResponse.json({ error: "This link isn't valid." }, { status: 404 })
   if (poll.status !== "OPEN") {
@@ -45,20 +49,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sha
 
   const { name, email } = parsed.data
 
-  // Already on the poll: hand back their own link rather than making a second
-  // participant for the same person with a second ballot.
+  // Already on the poll: never make a second participant with a second ballot.
+  // A public join link cannot reveal the existing bearer token to someone who
+  // merely knows an email address, but it can safely send that token back to
+  // the address that originally received it.
   const existing = await db.participant.findUnique({
     where: { pollId_email: { pollId: poll.id, email } },
-    select: { votedAt: true, optedOut: true },
+    select: { name: true, email: true, token: true, votedAt: true, optedOut: true },
   })
   if (existing) {
     if (existing.optedOut) {
       return NextResponse.json({ error: "You opted out of this poll." }, { status: 400 })
     }
-    return NextResponse.json({
-      status: existing.votedAt ? "already_voted" : "already_invited",
-      email,
-    })
   }
 
   const now = new Date()
@@ -84,6 +86,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sha
       { error: "A confirmation was just sent, or this link has sent too many recently. Try again later." },
       { status: 429 },
     )
+  }
+
+  if (existing) {
+    const delivery = await deliverInvites(poll, [existing])
+    if (delivery.sent.length === 0) {
+      return NextResponse.json(
+        { error: "We couldn't resend your personal voting link. Ask the organizer to send it directly." },
+        { status: 502 },
+      )
+    }
+    return NextResponse.json({ status: "resent", email })
   }
 
   const request = await db.$transaction(async (tx) => {
