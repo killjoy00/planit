@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { SignOutButton } from "@/components/ui/SignOutButton"
+import { isAdminEmail } from "@/lib/admin"
 
 /**
  * Everything behind sign-in is the product, not published content: it is kept
@@ -26,6 +27,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <nav className="flex items-center gap-4 text-sm">
             <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Dashboard</Link>
             <Link href="/groups" className="text-gray-600 hover:text-gray-900">Groups</Link>
+            {isAdminEmail(session.user.email) && (
+              <Link href="/admin" className="text-gray-600 hover:text-gray-900">Admin</Link>
+            )}
             <Link
               href="/polls/new"
               className="rounded-lg bg-indigo-600 px-3 py-1.5 text-white font-medium hover:bg-indigo-700 transition-colors"

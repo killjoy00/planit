@@ -45,6 +45,13 @@ registry plus a `app/(content)/guides/<slug>/page.tsx`.
 Optional env var: `NEXT_PUBLIC_ADSENSE_ARTICLE_SLOT` renders an explicit in-article
 unit below each guide. Leave it unset to rely on Auto ads.
 
+`/admin` shows aggregate usage — creator and poll counts, growth, vote-through
+rate, delivery health — computed from planit's own tables. It is not analytics
+or tracking of visitors; nothing is sent to a third party, matching the privacy
+policy. Gated by `ADMIN_EMAIL`: set it to the operator's sign-in address, case
+insensitive. Leave it unset and the route 404s for everyone, admin included —
+same fail-closed default as `CRON_SECRET`.
+
 ## Getting Started
 
 First, run the development server:
