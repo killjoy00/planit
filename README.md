@@ -86,12 +86,14 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Database migrations and deployment
 
-Production deployment applies committed migrations before building application
-code. Vercel uses this command through `vercel.json`:
+Production builds no longer mutate the database. A controlled deployment should
+apply committed migrations before releasing application code:
 
 ```bash
 npm run deploy:build
 ```
+
+Keep preview builds on `npm run build`; they must not migrate a shared database.
 
 The first migration is a baseline for databases previously managed by
 `prisma db push`. For an existing planit database, mark that baseline as
