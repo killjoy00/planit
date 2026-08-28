@@ -30,9 +30,20 @@ interface Props {
   pollType: string
   icsAvailable: boolean
   pollIdForIcs: string
+  pollTitle: string
   /** Public link the creator can hand out themselves. */
   shareUrl: string
   timeZone: string | null
+}
+
+function leadingOptions(data: ResultsData, pollType: string): Option[] {
+  if (pollType === "YES_NO_VETO") return []
+  const maxVotes = Math.max(0, ...data.options.map((option) => option.voteCount))
+  if (maxVotes === 0) return []
+  const attendanceLeaders = data.options.filter((option) => option.voteCount === maxVotes)
+  if (pollType !== "TIME_POLL") return attendanceLeaders
+  const maxIdeal = Math.max(...attendanceLeaders.map((option) => option.idealCount))
+  return attendanceLeaders.filter((option) => option.idealCount === maxIdeal)
 }
 
 // Hydrate vote counts from participants. One participant can contribute to
@@ -60,7 +71,7 @@ function hydrated(d: ResultsData): ResultsData {
   }
 }
 
-export function PollResults({ pollId, initialData, pollType, icsAvailable: initialIcsAvailable, pollIdForIcs, shareUrl, timeZone }: Props) {
+export function PollResults({ pollId, initialData, pollType, icsAvailable: initialIcsAvailable, pollIdForIcs, pollTitle, shareUrl, timeZone }: Props) {
   const router = useRouter()
   const [data, setData] = useState(initialData)
   const [isClosing, startClose] = useTransition()
@@ -77,6 +88,8 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
   const [copied, setCopied] = useState(false)
   const [copiedParticipantId, setCopiedParticipantId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [showTieChooser, setShowTieChooser] = useState(false)
+  const [closeError, setCloseError] = useState("")
 
   const refresh = useCallback(async () => {
     const fresh = await fetch(`/api/polls/${pollId}/results`)
@@ -171,15 +184,45 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
   const undelivered = h.participants.filter((p) => !p.inviteDelivered && !p.optedOut)
   const undeliveredResults = h.participants.filter((p) => !p.resultDelivered && !p.optedOut)
   const maxVotes = Math.max(...h.options.map((o) => o.voteCount), 1)
+  const winnerCandidates = leadingOptions(h, pollType)
 
-  async function handleClose() {
+  async function handleClose(winnerId?: string) {
+    setCloseError("")
     startClose(async () => {
-      const res = await fetch(`/api/polls/${pollId}/close`, { method: "POST" })
+      const res = await fetch(`/api/polls/${pollId}/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(winnerId ? { winnerId } : {}),
+      })
       if (res.ok) {
+        const result = await res.json()
         await refresh()
+        setShowTieChooser(!!result.needsDecision)
         router.refresh()
+      } else {
+        const result = await res.json().catch(() => null)
+        setCloseError(typeof result?.error === "string" ? result.error : "Could not close this poll.")
       }
     })
+  }
+
+  async function sharePoll() {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: pollTitle,
+          text: `Join my planit poll: ${pollTitle}`,
+          url: shareUrl,
+        })
+        return
+      }
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return
+      window.prompt("Copy this public join link:", shareUrl)
+    }
   }
 
   async function handleRemoveParticipant(participant: Participant) {
@@ -236,6 +279,39 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
         </div>
       )}
 
+      {(showTieChooser || (h.status === "CLOSED" && !h.winner && winnerCandidates.length > 1)) && (
+        <section className="rounded-xl border-2 border-indigo-300 bg-indigo-50 p-4" aria-labelledby="tie-heading">
+          <h2 id="tie-heading" className="font-semibold text-gray-900">You decide the tie</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            These options finished level. Choose the winner before planit emails the result.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {winnerCandidates.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => handleClose(option.id)}
+                disabled={isClosing}
+                className="rounded-lg border border-indigo-300 bg-white px-4 py-3 text-left hover:border-indigo-500 disabled:opacity-50"
+              >
+                <span className="block font-medium text-gray-900">{option.label}</span>
+                <span className="mt-0.5 block text-xs text-gray-500">
+                  {pollType === "TIME_POLL"
+                    ? `${option.voteCount} available · ${option.idealCount} ideal`
+                    : `${option.voteCount} vote${option.voteCount === 1 ? "" : "s"}`}
+                </span>
+              </button>
+            ))}
+          </div>
+          {h.status === "OPEN" && (
+            <button type="button" onClick={() => setShowTieChooser(false)} className="mt-3 text-sm text-gray-500 hover:underline">
+              Keep voting open
+            </button>
+          )}
+          {closeError && <p className="mt-2 text-sm text-red-600">{closeError}</p>}
+        </section>
+      )}
+
       {h.status === "OPEN" && (
         <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
           <div>
@@ -245,7 +321,7 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
               To send an invited person straight to their ballot, copy their personal link below.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
               readOnly
               value={shareUrl}
@@ -253,18 +329,24 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
               className="flex-1 min-w-0 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600"
             />
             <button
+              onClick={sharePoll}
+              className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              {copied ? "Link copied" : "Share poll"}
+            </button>
+            <button
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(shareUrl)
                   setCopied(true)
                   setTimeout(() => setCopied(false), 2000)
                 } catch {
-                  // Clipboard can be blocked; the field is selectable either way.
+                  window.prompt("Copy this public join link:", shareUrl)
                 }
               }}
-              className="shrink-0 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              className="shrink-0 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              {copied ? "Copied" : "Copy"}
+              Copy link
             </button>
           </div>
         </div>
@@ -275,7 +357,7 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
           <p className="text-sm font-medium text-gray-700">{voted} / {total} voted</p>
           {h.status === "OPEN" && (
             <button
-              onClick={handleClose}
+              onClick={() => winnerCandidates.length > 1 ? setShowTieChooser(true) : handleClose()}
               disabled={isClosing}
               className="text-sm text-red-600 hover:underline disabled:opacity-50"
             >
@@ -283,6 +365,7 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
             </button>
           )}
         </div>
+        {closeError && !showTieChooser && <p className="mb-3 text-sm text-red-600">{closeError}</p>}
 
         {pollType !== "YES_NO_VETO" ? (
           <div className="space-y-3">
@@ -338,6 +421,10 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
         )}
       </div>
 
+      {(pollType === "DATE_POLL" || pollType === "TIME_POLL") && h.participants.length > 0 && (
+        <AvailabilityMatrix data={h} pollType={pollType} timeZone={timeZone} />
+      )}
+
       <div>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-medium text-gray-700">Participants</h3>
@@ -373,7 +460,7 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
         )}
         {showAddInvite && h.status === "OPEN" && (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 mb-3 space-y-2">
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
                 placeholder="Name"
@@ -408,7 +495,7 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
             const shown = pickedLabels.slice(0, 3)
             const extra = pickedLabels.length - shown.length
             return (
-              <div key={p.id} className="flex items-start justify-between gap-3 py-1.5 text-sm">
+              <div key={p.id} className="flex flex-col items-start justify-between gap-2 py-2 text-sm sm:flex-row sm:gap-3">
                 <div className="min-w-0">
                   <div>
                     <span className={`font-medium ${p.optedOut ? "text-gray-400 line-through" : "text-gray-800"}`}>{p.name}</span>
@@ -420,7 +507,7 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
                   </div>
                   <p className="truncate text-xs text-gray-400">{p.email}</p>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 sm:w-auto sm:shrink-0 sm:justify-end">
                   <span className={`text-xs ${
                     p.optedOut ? "text-gray-400"
                       : p.voted ? "text-green-600"
@@ -468,5 +555,78 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
         </div>
       </div>
     </div>
+  )
+}
+
+function AvailabilityMatrix({ data, pollType, timeZone }: { data: ResultsData; pollType: string; timeZone: string | null }) {
+  const participants = data.participants.filter((participant) => !participant.optedOut)
+  if (participants.length === 0) return null
+
+  return (
+    <section>
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-medium text-gray-700">Availability matrix</h3>
+          <p className="text-xs text-gray-500">Scroll sideways on a phone to compare every option.</p>
+        </div>
+        <p className="text-xs text-gray-500">
+          {pollType === "TIME_POLL" ? "I = Ideal · W = Works · — = Can't" : "✓ = Available · — = Unavailable"} · … = Waiting
+        </p>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <table className="min-w-max border-collapse text-sm">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="sticky left-0 z-10 min-w-32 border-b border-r border-gray-200 bg-gray-50 px-3 py-2 text-left font-medium text-gray-600">
+                Person
+              </th>
+              {data.options.map((option) => {
+                const dateLabel = option.dateValue
+                  ? pollType === "TIME_POLL" && timeZone
+                    ? formatTimeSlot(option.dateValue, option.endDate, timeZone)
+                    : formatDateRange(option.dateValue, option.endDate)
+                  : null
+                return (
+                  <th key={option.id} className="min-w-28 max-w-40 border-b border-gray-200 px-3 py-2 text-center font-medium text-gray-700">
+                    <span className="block truncate" title={option.label}>{option.label}</span>
+                    {dateLabel && <span className="mt-0.5 block max-w-40 text-xs font-normal text-gray-400">{dateLabel}</span>}
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {participants.map((participant) => (
+              <tr key={participant.id} className="border-b border-gray-100 last:border-0">
+                <th className="sticky left-0 z-10 border-r border-gray-200 bg-white px-3 py-2 text-left font-medium text-gray-800">
+                  <span className="block max-w-32 truncate" title={participant.name}>{participant.name}</span>
+                </th>
+                {data.options.map((option) => {
+                  const preference = participant.preferences.find((item) => item.optionId === option.id)?.preference
+                  const available = participant.optionIds.includes(option.id)
+                  const mark = !participant.voted
+                    ? { label: "…", title: "Waiting for response", tone: "text-gray-400" }
+                    : pollType === "TIME_POLL"
+                      ? preference === "IDEAL"
+                        ? { label: "I", title: "Ideal", tone: "bg-green-50 text-green-700" }
+                        : preference === "AVAILABLE"
+                          ? { label: "W", title: "Works", tone: "bg-indigo-50 text-indigo-700" }
+                          : { label: "—", title: "Can't", tone: "text-gray-300" }
+                      : available
+                        ? { label: "✓", title: "Available", tone: "bg-green-50 text-green-700" }
+                        : { label: "—", title: "Unavailable", tone: "text-gray-300" }
+                  return (
+                    <td key={option.id} className={`px-3 py-2 text-center font-semibold ${mark.tone}`} title={`${participant.name}: ${mark.title}`}>
+                      <span className="sr-only">{mark.title}</span>
+                      <span aria-hidden>{mark.label}</span>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }

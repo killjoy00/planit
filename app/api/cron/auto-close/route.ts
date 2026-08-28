@@ -13,10 +13,12 @@ export async function GET(req: NextRequest) {
   })
 
   let closed = 0
+  let tiesNeedingDecision = 0
   for (const poll of expired) {
     const outcome = await closePollAndAnnounce(poll, "auto-close")
     if (outcome.closed) closed++
+    if (outcome.needsDecision) tiesNeedingDecision++
   }
 
-  return NextResponse.json({ closed })
+  return NextResponse.json({ closed, tiesNeedingDecision })
 }

@@ -70,7 +70,7 @@ export default function NewGroupPage() {
           <label className="block text-sm font-medium text-gray-700 mb-2">Members</label>
           <div className="space-y-2">
             {members.map((member, i) => (
-              <div key={i} className="flex gap-2">
+              <div key={i} className="flex flex-col gap-2 sm:flex-row">
                 <input
                   type="text"
                   placeholder="Name"
@@ -89,9 +89,10 @@ export default function NewGroupPage() {
                   <button
                     type="button"
                     onClick={() => removeMember(i)}
-                    className="text-gray-400 hover:text-red-500 px-1"
+                    className="self-start px-2 py-2 text-sm text-gray-500 hover:text-red-500 sm:self-auto"
+                    aria-label={`Remove member ${i + 1}`}
                   >
-                    ✕
+                    Remove
                   </button>
                 )}
               </div>

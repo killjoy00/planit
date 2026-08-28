@@ -117,16 +117,12 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName, template 
         }
       }
     }
-    if (step === 3) {
-      if (!creatorName.trim()) return setError("Add the name your invitees will see.")
-      if (allInvitees.length === 0) return setError("Add at least one invitee.")
-    }
+    if (step === 3 && !creatorName.trim()) return setError("Add the name participants will see.")
     setStep((s) => s + 1)
   }
 
   async function handleSubmit() {
     setError("")
-    if (allInvitees.length === 0) return setError("Add at least one invitee.")
 
     const requestOptions = pollType === "YES_NO_VETO"
       ? [{ label: title.trim() }]
@@ -184,7 +180,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName, template 
     })
   }
 
-  const stepLabels = ["Type", "Details", "Invitees", "Send"]
+  const stepLabels = ["Type", "Details", "People", "Create"]
 
   return (
     <div className="space-y-6">
@@ -309,7 +305,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName, template 
                       </div>
                     )}
                     {pollType === "TIME_POLL" && (
-                      <div className="grid grid-cols-2 gap-2 ml-0.5">
+                      <div className="ml-0.5 grid gap-2 sm:grid-cols-2">
                         <div>
                           <label className="block text-xs text-gray-400 mb-0.5">Starts</label>
                           <input
@@ -381,10 +377,13 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName, template 
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Additional invitees</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email invitees <span className="font-normal text-gray-400">(optional)</span></label>
+            <p className="mb-2 text-xs text-gray-500">
+              Create without invitees if you would rather share the join link through text or group chat.
+            </p>
             <div className="space-y-2">
               {extraInvitees.map((inv, i) => (
-                <div key={i} className="flex gap-2">
+                <div key={i} className="flex flex-col gap-2 sm:flex-row">
                   <input
                     type="text"
                     placeholder="Name"
@@ -399,13 +398,13 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName, template 
                     onChange={(e) => updateExtra(i, "email", e.target.value)}
                     className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
                   />
-                  <button type="button" onClick={() => removeExtra(i)} className="text-gray-400 hover:text-red-500">✕</button>
+                  <button type="button" onClick={() => removeExtra(i)} className="self-start px-2 py-2 text-sm text-gray-500 hover:text-red-500 sm:self-auto" aria-label={`Remove invitee ${i + 1}`}>Remove</button>
                 </div>
               ))}
             </div>
             <button type="button" onClick={addExtra} className="mt-2 text-sm text-indigo-600 hover:underline">+ Add invitee</button>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Deadline <span className="text-gray-400 font-normal">(optional)</span></label>
               <input
@@ -429,7 +428,7 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName, template 
           </div>
           <div className="rounded-xl border-2 border-gray-200 bg-white px-4 py-3">
             <p className="text-sm font-medium text-gray-900">Remind people who haven&apos;t voted</p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => setRemindBeforeDeadline(false)}
@@ -519,12 +518,14 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName, template 
             {pollType === "TIME_POLL" && (
               <div className="flex justify-between"><span className="text-gray-500">Time zone</span><span className="font-medium">{timeZone}</span></div>
             )}
-            <div className="flex justify-between"><span className="text-gray-500">Invitees</span><span className="font-medium">{allInvitees.length} people</span></div>
+            <div className="flex justify-between gap-4"><span className="text-gray-500">Starting by</span><span className="text-right font-medium">{allInvitees.length > 0 ? `Emailing ${allInvitees.length} ${allInvitees.length === 1 ? "person" : "people"}` : "Sharing a join link"}</span></div>
             {deadline && <div className="flex justify-between"><span className="text-gray-500">Deadline</span><span className="font-medium">{new Date(deadline).toLocaleDateString()}</span></div>}
             <div className="flex justify-between"><span className="text-gray-500">Reminders</span><span className="font-medium">{deadline && remindBeforeDeadline ? "72h/48h/24h before deadline" : "24h/48h/96h after sending"}</span></div>
           </div>
           <p className="text-sm text-gray-500">
-            {allInvitees.length} invite email{allInvitees.length !== 1 ? "s" : ""} will be sent immediately.
+            {allInvitees.length > 0
+              ? `${allInvitees.length} invite email${allInvitees.length === 1 ? "" : "s"} will be sent immediately.`
+              : "Your poll will be created first, then you can share its secure public join link."}
           </p>
         </div>
       )}
@@ -555,7 +556,11 @@ export function PollWizard({ groups, defaultCreatorName, hasSavedName, template 
             disabled={isPending}
             className="flex-1 rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
-            {isPending ? "Sending…" : `Send ${allInvitees.length} invite${allInvitees.length !== 1 ? "s" : ""} →`}
+            {isPending
+              ? "Creating…"
+              : allInvitees.length > 0
+                ? `Create & send ${allInvitees.length} invite${allInvitees.length === 1 ? "" : "s"} →`
+                : "Create poll & share →"}
           </button>
         )}
       </div>

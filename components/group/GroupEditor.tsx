@@ -86,15 +86,15 @@ export function GroupEditor({ group }: Props) {
         <label className="block text-sm font-medium text-gray-700 mb-2">Current members</label>
         <div className="space-y-2">
           {members.map((m) => (
-            <div key={m.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm">
+            <div key={m.id} className="flex flex-wrap items-center justify-between gap-x-3 rounded-lg border border-gray-200 px-3 py-2 text-sm">
               <span className="font-medium text-gray-800">{m.name}</span>
-              <span className="text-gray-500">{m.email}</span>
+              <span className="min-w-0 flex-1 truncate text-gray-500 sm:text-right">{m.email}</span>
               <button
                 type="button"
                 onClick={() => removeExisting(m.id)}
                 className="text-gray-400 hover:text-red-500 ml-2"
               >
-                ✕
+                Remove
               </button>
             </div>
           ))}
@@ -105,7 +105,7 @@ export function GroupEditor({ group }: Props) {
         <label className="block text-sm font-medium text-gray-700 mb-2">Add members</label>
         <div className="space-y-2">
           {newMembers.map((m, i) => (
-            <div key={i} className="flex gap-2">
+            <div key={i} className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
                 placeholder="Name"
@@ -121,7 +121,7 @@ export function GroupEditor({ group }: Props) {
                 className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
               />
               {newMembers.length > 1 && (
-                <button type="button" onClick={() => removeNew(i)} className="text-gray-400 hover:text-red-500">✕</button>
+                <button type="button" onClick={() => removeNew(i)} className="self-start px-2 py-2 text-sm text-gray-500 hover:text-red-500 sm:self-auto" aria-label={`Remove new member ${i + 1}`}>Remove</button>
               )}
             </div>
           ))}
@@ -132,7 +132,7 @@ export function GroupEditor({ group }: Props) {
       {error && <p className="text-sm text-red-600">{error}</p>}
       {success && <p className="text-sm text-green-600">{success}</p>}
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <button
           type="submit"
           disabled={isPending}

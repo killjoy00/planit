@@ -2,12 +2,13 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
+import { MAX_INVITEES_PER_POLL } from "@/lib/limits"
 
 const schema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5_000).nullable(),
   deadline: z.string().datetime().nullable(),
-  threshold: z.number().int().positive().nullable(),
+  threshold: z.number().int().positive().max(MAX_INVITEES_PER_POLL).nullable(),
   reminderSchedule: z.enum(["AFTER_SEND", "BEFORE_DEADLINE"]),
   replyToCreator: z.boolean(),
 })
@@ -21,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const poll = await db.poll.findFirst({
     where: { id, creatorId: session.user.id },
-    select: { status: true, participants: { where: { optedOut: false }, select: { id: true } } },
+    select: { status: true },
   })
   if (!poll) return NextResponse.json({ error: "Not found" }, { status: 404 })
   if (poll.status !== "OPEN") return NextResponse.json({ error: "Only open polls can be edited." }, { status: 400 })
@@ -32,9 +33,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (reminderSchedule === "BEFORE_DEADLINE" && !deadline) {
     return NextResponse.json({ error: "Deadline-based reminders need a deadline." }, { status: 400 })
-  }
-  if (threshold && threshold > poll.participants.length) {
-    return NextResponse.json({ error: "Auto-close cannot exceed the active participant count." }, { status: 400 })
   }
 
   await db.poll.update({

@@ -111,11 +111,12 @@ const FAQS: { section: string; items: Faq[] }[] = [
           <p>
             No &mdash; groups persist. Add your people once and every poll after that is a two-step
             job: pick the group, send it. You can add participants to an open poll if you forgot
-            someone, and their invitation goes out immediately.
+            someone, and their invitation goes out immediately. Or create without a guest list and
+            share the public join link through text or group chat instead.
           </p>
         ),
         text:
-          "No. Groups persist, so you add people once and reuse the group for every later poll. You can also add participants to a poll that is already open.",
+          "No. Groups persist, so you add people once and reuse the group for every later poll. You can also create without invitees and share a public join link.",
       },
       {
         q: "What happens when a poll closes?",
@@ -123,11 +124,12 @@ const FAQS: { section: string; items: Faq[] }[] = [
           <p>
             The winning option is announced to everyone who took part, and you can download a
             calendar file for it. If a poll reaches its deadline it closes automatically; you can
-            also close one early once the answer is obvious.
+            also close one early once the answer is obvious. If the top options are tied, planit
+            waits for the organizer to choose the winner before sending the announcement.
           </p>
         ),
         text:
-          "The winning option is announced to everyone who took part and can be downloaded as a calendar file. Polls close automatically at their deadline, or early if you close them.",
+          "The winning option is announced to everyone who took part and can be downloaded as a calendar file. If top options tie, the organizer chooses before the announcement is sent.",
       },
       {
         q: "Can voters see how everyone else voted?",
