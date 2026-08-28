@@ -86,18 +86,22 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Database migrations and deployment
 
-Production builds no longer mutate the database. A controlled deployment should
-apply committed migrations before releasing application code:
+Vercel production builds apply committed migrations before releasing application
+code. Preview builds skip that step, even if they share the production database.
+The production bootstrap recognizes an empty database, a Prisma-managed database,
+and the exact legacy schema that planit previously created with `prisma db push`.
+It refuses to guess when it finds a partial or unexpected schema.
+
+For other hosts, a controlled deployment should apply migrations before the
+application build:
 
 ```bash
 npm run deploy:build
 ```
 
-Keep preview builds on `npm run build`; they must not migrate a shared database.
-
-The first migration is a baseline for databases previously managed by
-`prisma db push`. For an existing planit database, mark that baseline as
-already applied once, then run the feature migration:
+The first migration remains a baseline for databases previously managed by
+`prisma db push`. If migrating an existing planit database manually, mark that
+baseline as already applied once, then run the feature migration:
 
 ```bash
 npx prisma migrate resolve --applied 20260827000000_baseline
