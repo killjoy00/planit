@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { selectTimePollWinner } from "../lib/time-poll.ts"
+import { selectTimePollWinner, selectTimePollWinners } from "../lib/time-poll.ts"
 
 const options = [
   { id: "early", order: 0 },
@@ -25,10 +25,14 @@ test("ideal votes break attendance ties", () => {
   assert.equal(winner?.id, "early")
 })
 
-test("creator order breaks complete ties", () => {
-  const winner = selectTimePollWinner(options, [
+test("complete ties are preserved for the organizer", () => {
+  const winners = selectTimePollWinners(options, [
     { optionId: "early", preference: "AVAILABLE" },
     { optionId: "late", preference: "AVAILABLE" },
   ])
-  assert.equal(winner?.id, "early")
+  assert.deepEqual(winners.map((winner) => winner.id), ["early", "late"])
+  assert.equal(selectTimePollWinner(options, [
+    { optionId: "early", preference: "AVAILABLE" },
+    { optionId: "late", preference: "AVAILABLE" },
+  ])?.id, "early")
 })

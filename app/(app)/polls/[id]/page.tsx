@@ -95,6 +95,7 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
         pollType={poll.type}
         icsAvailable={!!poll.winner?.dateValue}
         pollIdForIcs={id}
+        pollTitle={poll.title}
         shareUrl={`${appUrl()}/join/${shareToken}`}
         timeZone={poll.timeZone}
       />

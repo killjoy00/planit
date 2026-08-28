@@ -3,7 +3,7 @@ import type { Poll, PollOption, Participant, Vote } from "@/app/generated/prisma
 import { db } from "./db"
 import { appUrl } from "./site"
 import { creatorDisplayName } from "./display-name"
-import { determineWinner } from "./poll-logic"
+import { determineWinner, determineWinnerCandidates } from "./poll-logic"
 import { sendWinnerEmails, type DeliveryResult } from "./email"
 
 /**
@@ -11,7 +11,7 @@ import { sendWinnerEmails, type DeliveryResult } from "./email"
  * this, so a caller cannot forget a relation and only find out when the
  * announcement goes out with a blank sender name.
  */
-type ClosablePoll = Pick<Poll, "id" | "title" | "type" | "replyToCreator"> & {
+type ClosablePoll = Pick<Poll, "id" | "title" | "type" | "replyToCreator" | "winnerId"> & {
   options: PollOption[]
   participants: Participant[]
   votes: Vote[]
@@ -29,6 +29,9 @@ export interface CloseOutcome {
   /** False when someone else closed the poll first; nothing was sent. */
   closed: boolean
   winner: PollOption | null
+  /** More than one top option closed without an organizer selection. */
+  needsDecision: boolean
+  winnerCandidates: PollOption[]
   delivery: DeliveryResult
 }
 
@@ -38,8 +41,11 @@ export async function deliverPollResults(
   poll: ClosablePoll,
   participants: Participant[],
   source: string,
+  selectedWinner?: PollOption,
 ): Promise<DeliveryResult> {
-  const winner = determineWinner(poll)
+  const winner = selectedWinner
+    ?? poll.options.find((option) => option.id === poll.winnerId)
+    ?? determineWinner(poll)
   if (!winner || participants.length === 0) return NOTHING_SENT
 
   const base = appUrl()
@@ -109,18 +115,57 @@ export async function closePollAndAnnounce(
   poll: ClosablePoll,
   /** Tag for the log line, e.g. "auto-close" — says which path closed it. */
   source: string,
+  selectedWinnerId?: string,
 ): Promise<CloseOutcome> {
-  const winner = determineWinner(poll)
+  const winnerCandidates = determineWinnerCandidates(poll)
+  const selectedWinner = selectedWinnerId
+    ? winnerCandidates.find((option) => option.id === selectedWinnerId)
+    : undefined
+  if (selectedWinnerId && !selectedWinner) throw new Error("INVALID_WINNER")
+
+  const winner = selectedWinner ?? (winnerCandidates.length === 1 ? winnerCandidates[0] : null)
 
   const { count } = await db.poll.updateMany({
     where: { id: poll.id, status: "OPEN" },
     data: { status: "CLOSED", winnerId: winner?.id ?? null },
   })
-  if (count === 0) return { closed: false, winner: null, delivery: NOTHING_SENT }
+  if (count === 0) {
+    return { closed: false, winner: null, needsDecision: false, winnerCandidates: [], delivery: NOTHING_SENT }
+  }
 
-  if (!winner) return { closed: true, winner: null, delivery: NOTHING_SENT }
+  if (!winner) {
+    return {
+      closed: true,
+      winner: null,
+      needsDecision: winnerCandidates.length > 1,
+      winnerCandidates,
+      delivery: NOTHING_SENT,
+    }
+  }
 
-  const delivery = await deliverPollResults(poll, poll.participants, source)
+  const delivery = await deliverPollResults(poll, poll.participants, source, winner)
 
-  return { closed: true, winner, delivery }
+  return { closed: true, winner, needsDecision: false, winnerCandidates, delivery }
+}
+
+/** Choose the winner of a closed tie and send the announcement exactly once. */
+export async function resolvePollTieAndAnnounce(
+  poll: ClosablePoll,
+  selectedWinnerId: string,
+  source: string,
+): Promise<CloseOutcome> {
+  const winnerCandidates = determineWinnerCandidates(poll)
+  const winner = winnerCandidates.find((option) => option.id === selectedWinnerId)
+  if (winnerCandidates.length < 2 || !winner) throw new Error("INVALID_WINNER")
+
+  const { count } = await db.poll.updateMany({
+    where: { id: poll.id, status: "CLOSED", winnerId: null },
+    data: { winnerId: winner.id },
+  })
+  if (count === 0) {
+    return { closed: false, winner: null, needsDecision: false, winnerCandidates: [], delivery: NOTHING_SENT }
+  }
+
+  const delivery = await deliverPollResults(poll, poll.participants, source, winner)
+  return { closed: true, winner, needsDecision: false, winnerCandidates, delivery }
 }

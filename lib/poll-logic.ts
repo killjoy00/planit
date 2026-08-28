@@ -1,10 +1,11 @@
 import type { Poll, PollOption, Participant, Vote } from "@/app/generated/prisma/client"
 import { VoteChoice } from "@/app/generated/prisma/enums"
-import { selectTimePollWinner } from "./time-poll"
+import { selectTimePollWinners } from "./time-poll"
+import { selectPluralityWinners } from "./winner-candidates"
 
 type PollForWinner = Pick<Poll, "type"> & {
   options: PollOption[]
-  votes: Vote[]
+  votes: Pick<Vote, "optionId" | "choice" | "preference">[]
 }
 
 /**
@@ -24,7 +25,7 @@ export function getUnvotedParticipants(
   return participants.filter((p) => !p.votedAt && !p.optedOut)
 }
 
-export function determineWinner(poll: PollForWinner): PollOption | null {
+export function determineWinnerCandidates(poll: PollForWinner): PollOption[] {
   const { options, votes, type } = poll
 
   if (type === "YES_NO_VETO") {
@@ -32,39 +33,22 @@ export function determineWinner(poll: PollForWinner): PollOption | null {
       (v) => v.choice === VoteChoice.YES || v.choice === VoteChoice.FINE
     ).length
     const noCount = votes.filter((v) => v.choice === VoteChoice.NO).length
-    if (noCount > 0) return null
-    if (yesFineCount > 0) return options[0] ?? null
-    return null
+    if (noCount > 0) return []
+    if (yesFineCount > 0 && options[0]) return [options[0]]
+    return []
   }
 
   if (type === "TIME_POLL") {
-    return selectTimePollWinner(options, votes)
+    return selectTimePollWinners(options, votes)
   }
 
-  // DATE_POLL and SINGLE_CHOICE: the option with the most votes wins. On a date
-  // poll each vote row is one person marking themselves available for that
-  // date, so this reads as "the date the most people can make". Ties go to the
-  // earliest option by `order`.
-  const counts = new Map<string, number>()
-  for (const option of options) {
-    counts.set(option.id, 0)
-  }
-  for (const vote of votes) {
-    if (vote.optionId && counts.has(vote.optionId)) {
-      counts.set(vote.optionId, (counts.get(vote.optionId) ?? 0) + 1)
-    }
-  }
+  // DATE_POLL and SINGLE_CHOICE: every option with the most votes is a candidate.
+  // The organizer, rather than option-entry order, decides a complete tie.
+  return selectPluralityWinners(options, votes)
+}
 
-  let winnerOption: PollOption | null = null
-  let maxVotes = 0
-  for (const option of [...options].sort((a, b) => a.order - b.order)) {
-    const count = counts.get(option.id) ?? 0
-    if (count > maxVotes) {
-      maxVotes = count
-      winnerOption = option
-    }
-  }
-  return maxVotes > 0 ? winnerOption : null
+export function determineWinner(poll: PollForWinner): PollOption | null {
+  return determineWinnerCandidates(poll)[0] ?? null
 }
 
 export function checkThreshold(

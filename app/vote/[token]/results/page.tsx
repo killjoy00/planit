@@ -5,6 +5,7 @@ import { db } from "@/lib/db"
 import { creatorDisplayName } from "@/lib/display-name"
 import { isMultiSelect } from "@/lib/poll-logic"
 import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
+import { determineWinnerCandidates } from "@/lib/poll-logic"
 
 /**
  * The results, for the people who voted.
@@ -38,7 +39,7 @@ export default async function VoteResultsPage({ params }: { params: Promise<{ to
           // Yes/no ballots carry a `choice` and no `optionId`, so they hang off
           // the poll rather than any option — they are not reachable through
           // `options.votes`.
-          votes: { select: { choice: true } },
+          votes: { select: { optionId: true, choice: true, preference: true } },
           participants: { select: { votedAt: true, optedOut: true } },
           creator: { select: { name: true, email: true } },
           winner: true,
@@ -63,6 +64,8 @@ export default async function VoteResultsPage({ params }: { params: Promise<{ to
       .map((vote) => [vote.optionId!, vote.preference!]),
   )
   const isOpen = poll.status === "OPEN"
+  const winnerCandidates = determineWinnerCandidates(poll)
+  const tieNeedsDecision = poll.status === "CLOSED" && !poll.winner && winnerCandidates.length > 1
 
   // On a date poll a vote means "this works for me", so the denominator is
   // people, not votes cast — several options can each reach 100%.
@@ -107,9 +110,13 @@ export default async function VoteResultsPage({ params }: { params: Promise<{ to
 
         {!isOpen && !poll.winner && (
           <div className="rounded-xl bg-gray-100 border border-gray-200 p-6 text-center">
-            <p className="text-gray-700 font-medium">This poll closed without a decision.</p>
+            <p className="text-gray-700 font-medium">
+              {tieNeedsDecision ? "The organizer is deciding the tie." : "This poll closed without a decision."}
+            </p>
             <p className="text-sm text-gray-500 mt-1">
-              {poll.type === "YES_NO_VETO"
+              {tieNeedsDecision
+                ? "The tied options are shown below. Everyone will get the final result once the organizer chooses."
+                : poll.type === "YES_NO_VETO"
                 ? "Someone vetoed it."
                 : "No option got a vote."}
             </p>

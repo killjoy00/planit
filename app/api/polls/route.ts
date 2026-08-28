@@ -25,9 +25,11 @@ const schema = z.object({
     endDate: z.string().datetime().optional(),
   })).min(1).max(MAX_OPTIONS_PER_POLL),
   groupId: z.string().optional(),
-  invitees: z.array(contactSchema).min(1).max(MAX_INVITEES_PER_POLL),
+  // Email invitations are optional: a creator may make the poll first and
+  // distribute its public join link through chat, text, or a native share sheet.
+  invitees: z.array(contactSchema).max(MAX_INVITEES_PER_POLL),
   deadline: z.string().datetime().optional(),
-  threshold: z.number().int().positive().optional(),
+  threshold: z.number().int().positive().max(MAX_INVITEES_PER_POLL).optional(),
   allowSuggestions: z.boolean().optional(),
   replyToCreator: z.boolean().optional(),
   /** How nudges are timed. Counting back from a deadline needs one to exist. */
@@ -47,12 +49,6 @@ export async function POST(req: NextRequest) {
   // A group's members and the hand-typed extras overlap all the time, and two
   // rows for one address is a unique-constraint failure on the whole create.
   const recipients = normalizeContacts(invitees)
-  if (recipients.length === 0) {
-    return NextResponse.json({ error: "Add at least one invitee." }, { status: 400 })
-  }
-  if (threshold && threshold > recipients.length) {
-    return NextResponse.json({ error: "Auto-close cannot require more people than are invited." }, { status: 400 })
-  }
   if (deadline && new Date(deadline) <= new Date()) {
     return NextResponse.json({ error: "The deadline must be in the future." }, { status: 400 })
   }
@@ -130,9 +126,9 @@ export async function POST(req: NextRequest) {
             order: i,
           })),
         },
-        participants: {
-          create: recipients.map((inv) => ({ name: inv.name, email: inv.email })),
-        },
+        participants: recipients.length > 0
+          ? { create: recipients.map((inv) => ({ name: inv.name, email: inv.email })) }
+          : undefined,
       },
       include: {
         participants: true,

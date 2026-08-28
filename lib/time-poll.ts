@@ -8,12 +8,12 @@ export interface TimePollVote {
   preference: "IDEAL" | "AVAILABLE" | null
 }
 
-/** Maximize attendance, then ideal votes, then keep the creator's option order. */
-export function selectTimePollWinner<T extends TimePollOption>(
+/** Maximize attendance, then ideal votes, while preserving every complete tie. */
+export function selectTimePollWinners<T extends TimePollOption>(
   options: T[],
   votes: TimePollVote[],
-): T | null {
-  let winner: T | null = null
+): T[] {
+  let winners: T[] = []
   let bestAvailable = 0
   let bestIdeal = 0
 
@@ -22,11 +22,21 @@ export function selectTimePollWinner<T extends TimePollOption>(
     const available = optionVotes.length
     const ideal = optionVotes.filter((vote) => vote.preference === "IDEAL").length
     if (available > bestAvailable || (available === bestAvailable && ideal > bestIdeal)) {
-      winner = option
+      winners = [option]
       bestAvailable = available
       bestIdeal = ideal
+    } else if (available > 0 && available === bestAvailable && ideal === bestIdeal) {
+      winners.push(option)
     }
   }
 
-  return bestAvailable > 0 ? winner : null
+  return bestAvailable > 0 ? winners : []
+}
+
+/** Compatibility helper for displays that need one deterministic leader. */
+export function selectTimePollWinner<T extends TimePollOption>(
+  options: T[],
+  votes: TimePollVote[],
+): T | null {
+  return selectTimePollWinners(options, votes)[0] ?? null
 }

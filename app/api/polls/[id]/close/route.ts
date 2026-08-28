@@ -1,9 +1,16 @@
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
-import { CLOSABLE_POLL_INCLUDE, closePollAndAnnounce } from "@/lib/close-poll"
+import { z } from "zod"
+import {
+  CLOSABLE_POLL_INCLUDE,
+  closePollAndAnnounce,
+  resolvePollTieAndAnnounce,
+} from "@/lib/close-poll"
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+const schema = z.object({ winnerId: z.string().optional() })
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
@@ -16,14 +23,31 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (!poll || poll.creatorId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
-  if (poll.status !== "OPEN") {
+  const parsed = schema.safeParse(await req.json().catch(() => ({})))
+  if (!parsed.success) return NextResponse.json({ error: "Invalid winner" }, { status: 400 })
+
+  if (poll.status !== "OPEN" && !(poll.status === "CLOSED" && !poll.winnerId && parsed.data.winnerId)) {
     return NextResponse.json({ error: "Poll already closed" }, { status: 400 })
   }
 
-  const { closed, winner } = await closePollAndAnnounce(poll, "close")
+  const outcome = await (poll.status === "OPEN"
+    ? closePollAndAnnounce(poll, "close", parsed.data.winnerId)
+    : resolvePollTieAndAnnounce(poll, parsed.data.winnerId!, "tie-resolution")
+  ).catch((error: unknown) => {
+    if (error instanceof Error && error.message === "INVALID_WINNER") return null
+    throw error
+  })
+  if (!outcome) return NextResponse.json({ error: "Choose one of the tied options." }, { status: 400 })
+
+  const { closed, winner, needsDecision, winnerCandidates } = outcome
   if (!closed) {
     return NextResponse.json({ error: "Poll already closed" }, { status: 400 })
   }
 
-  return NextResponse.json({ ok: true, winnerId: winner?.id ?? null })
+  return NextResponse.json({
+    ok: true,
+    winnerId: winner?.id ?? null,
+    needsDecision,
+    winnerCandidateIds: winnerCandidates.map((option) => option.id),
+  })
 }

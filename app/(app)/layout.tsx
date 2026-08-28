@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { SignOutButton } from "@/components/ui/SignOutButton"
 import { isAdminEmail } from "@/lib/admin"
+import { AppNavigation } from "@/components/ui/AppNavigation"
 
 /**
  * Everything behind sign-in is the product, not published content: it is kept
@@ -24,23 +24,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/dashboard" className="text-lg font-bold text-indigo-600">
             planit
           </Link>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Dashboard</Link>
-            <Link href="/groups" className="text-gray-600 hover:text-gray-900">Groups</Link>
-            {isAdminEmail(session.user.email) && (
-              <Link href="/admin" className="text-gray-600 hover:text-gray-900">Admin</Link>
-            )}
-            <Link
-              href="/polls/new"
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-white font-medium hover:bg-indigo-700 transition-colors"
-            >
-              New poll
-            </Link>
-            <SignOutButton />
-          </nav>
+          <AppNavigation showAdmin={isAdminEmail(session.user.email)} />
         </div>
       </header>
-      <main className="max-w-3xl mx-auto px-4 py-8">{children}</main>
+      <main className="max-w-3xl mx-auto px-4 py-6 sm:py-8">{children}</main>
     </div>
   )
 }
