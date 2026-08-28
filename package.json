@@ -13,7 +13,8 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
-    "deploy:build": "npm run db:migrate && npm run build"
+    "deploy:build": "npm run db:migrate && npm run build",
+    "vercel:build": "node scripts/vercel-migrate.mjs && npm run build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
