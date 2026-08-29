@@ -1,5 +1,5 @@
 import { headers } from "next/headers"
-import type { EmailSendPurpose, Prisma } from "@/app/generated/prisma/client"
+import type { EmailSendPurpose } from "@/app/generated/prisma/client"
 
 import { db } from "./db"
 
@@ -41,6 +41,17 @@ interface ReserveEmailSendInput {
  * The previous check-then-create sequence let a burst of simultaneous requests
  * all observe the same empty window. Transaction-scoped advisory locks make the
  * decision and its record one operation for both the address and source.
+ *
+ * The locks are the whole mechanism, and they must not be paired with
+ * `Serializable`. Postgres takes a transaction's snapshot before it reaches the
+ * lock, so callers queued behind the lock go on to read a snapshot from before
+ * the holder committed; their counts and their insert then look to SSI exactly
+ * like the write skew it exists to prevent, and it aborts them. The lock has
+ * already ruled that anomaly out by making the transactions run one at a time,
+ * so the abort is pure loss: twelve concurrent sign-ins for twelve different
+ * addresses produced two emails and ten `P2034` failures, each surfacing as a
+ * page that says "check your inbox" for mail that was never sent. Read
+ * Committed re-reads per statement, which is what a queued caller needs.
  */
 export async function reserveEmailSend({
   purpose,
@@ -96,7 +107,7 @@ export async function reserveEmailSend({
       data: { purpose, email: address, ip, scope },
     })
     return null
-  }, { isolationLevel: "Serializable" as Prisma.TransactionIsolationLevel })
+  })
 }
 
 export async function pruneEmailSendAttempts(now: Date = new Date()): Promise<number> {
