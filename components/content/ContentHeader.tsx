@@ -9,6 +9,9 @@ export function ContentHeader() {
           planit
         </Link>
         <nav className="flex items-center gap-4 text-sm sm:gap-5">
+          <Link href="/demo" className="text-gray-600 hover:text-gray-900">
+            Demo
+          </Link>
           <Link href="/guides" className="text-gray-600 hover:text-gray-900">
             Guides
           </Link>
