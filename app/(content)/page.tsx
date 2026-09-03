@@ -60,6 +60,13 @@ export default async function HomePage() {
             Start planning →
           </Link>
           <p className="mt-3 text-sm text-gray-400">Free. No credit card.</p>
+          <p className="mt-2 text-sm text-gray-500">
+            Not ready to sign in?{" "}
+            <Link href="/demo" className="text-indigo-600 hover:underline font-medium">
+              Try a live poll first
+            </Link>
+            .
+          </p>
         </div>
       </section>
 
