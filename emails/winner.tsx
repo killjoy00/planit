@@ -8,6 +8,8 @@ export default function WinnerEmail({
   participantName,
   pollTitle,
   winnerLabel,
+  finalLocation,
+  finalNotes,
   resultsUrl,
   icsUrl,
   unsubscribeUrl,
@@ -35,10 +37,16 @@ export default function WinnerEmail({
       >
         {winnerLabel}
       </Text>
-      <Button href={resultsUrl}>See full results</Button>
+      {(finalLocation || finalNotes) && (
+        <Text style={{ fontSize: "15px", color: "#374151", margin: "0 0 18px", lineHeight: "22px" }}>
+          {finalLocation && <><strong>Where:</strong> {finalLocation}<br /></>}
+          {finalNotes && <><strong>Plan:</strong> {finalNotes}</>}
+        </Text>
+      )}
+      <Button href={resultsUrl}>See the final plan</Button>
       {icsUrl && (
         <Text style={{ fontSize: "14px", color: "#6b7280", textAlign: "center", margin: "0" }}>
-          <a href={icsUrl} style={{ color: "#4f46e5" }}>Add to calendar (.ics)</a>
+          <a href={icsUrl} style={{ color: "#4f46e5" }}>Add it to your calendar (.ics)</a>
         </Text>
       )}
       <Footer unsubscribeUrl={unsubscribeUrl} />
