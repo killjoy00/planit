@@ -6,7 +6,6 @@ import { creatorDisplayName } from "./display-name"
 import { determineWinner } from "./poll-logic"
 import { sendWinnerEmails, type DeliveryResult } from "./email"
 import {
-  CLOSABLE_POLL_INCLUDE,
   closePollRecord,
   resolvePollTieRecord,
   type ClosablePoll,
