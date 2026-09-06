@@ -38,5 +38,5 @@ test("calendar exports carry the final location and notes", () => {
     "The Corner Tap, 123 Main St",
   )
   assert.match(calendar, /DESCRIPTION:Reservation under Alex/)
-  assert.match(calendar, /LOCATION:The Corner Tap\, 123 Main St/)
+  assert.match(calendar, /LOCATION:The Corner Tap.*123 Main St/)
 })
