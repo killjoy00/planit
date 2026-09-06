@@ -11,7 +11,7 @@ const CONTACT = "privacy@planitnow.us"
 
 export default function PrivacyPage() {
   return (
-    <Prose title="Privacy Policy" updated="July 25, 2026">
+    <Prose title="Privacy Policy" updated="September 6, 2026">
       <p>
         This policy explains what planit (&quot;we&quot;, &quot;the service&quot;) collects,
         why, and what happens to it. planit is operated as an independent project and is
@@ -33,12 +33,21 @@ export default function PrivacyPage() {
         </p>
         <p>
           <strong className="text-gray-900">Poll content:</strong> titles, descriptions,
-          options, dates, deadlines, and the groups and member lists that poll creators
+          options, dates, deadlines, final plan details, and the groups and member lists that poll creators
           build.
         </p>
         <p>
+          <strong className="text-gray-900">Abuse-protection records:</strong> when a public
+          sign-in or poll-join form asks planit to send an email, we temporarily record the
+          recipient address, the kind of message requested, a timestamp, and, when available,
+          the source IP address and the public-link scope involved. These records exist only to
+          enforce short rate limits and prevent the forms from being used to bombard addresses.
+          They are automatically pruned after two days.
+        </p>
+        <p>
           We do not collect payment details, and we do not run analytics or tracking
-          software of our own.
+          software of our own. As with any hosted web service, our infrastructure providers may
+          process ordinary request and security logs as part of operating the service.
         </p>
       </Section>
 
@@ -52,6 +61,11 @@ export default function PrivacyPage() {
         <p>
           Every invitation and reminder contains a one-click opt-out link. Using it stops
           all further email for that poll immediately.
+        </p>
+        <p>
+          The short-lived abuse-protection records described above are used only to enforce
+          sending limits and investigate delivery or abuse problems; they are not used to build
+          profiles, personalize the product, or target advertising.
         </p>
       </Section>
 
@@ -126,7 +140,8 @@ export default function PrivacyPage() {
       <Section heading="Retention and deletion">
         <p>
           Polls, votes, and group member lists are kept until they are deleted. A poll
-          creator can delete their groups from within the app.
+          creator can delete their groups from within the app. Rate-limit records used to protect
+          the public email forms are automatically deleted after two days.
         </p>
         <p>
           To have your account, or your name and email as a participant, removed entirely,
