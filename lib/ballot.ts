@@ -1,6 +1,6 @@
-import { db } from "./db"
-import { isMultiSelect } from "./poll-logic"
-import { pollMutationLockKey } from "./poll-closing"
+import { db } from "./db.ts"
+import { isMultiSelect } from "./poll-logic.ts"
+import { pollMutationLockKey } from "./poll-closing.ts"
 
 export type BallotErrorCode =
   | "NOT_FOUND"
