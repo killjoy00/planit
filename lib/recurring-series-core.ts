@@ -8,17 +8,6 @@ const NEXT_POLL_INCLUDE = {
   creator: { select: { name: true, email: true } },
 } as const
 
-async function findSeriesPoll(id: string) {
-  return db.poll.findUnique({ where: { id }, include: NEXT_POLL_INCLUDE })
-}
-
-type SeriesPoll = NonNullable<Awaited<ReturnType<typeof findSeriesPoll>>>
-
-export interface MaterializedOccurrence {
-  poll: SeriesPoll
-  created: boolean
-}
-
 /**
  * Create exactly one next occurrence for a recurring series.
  *
@@ -26,9 +15,7 @@ export interface MaterializedOccurrence {
  * transaction-scoped advisory lock lets concurrent close/cancel paths observe
  * the same committed state instead of racing into that constraint.
  */
-export async function materializeNextSeriesPoll(
-  sourcePollId: string,
-): Promise<MaterializedOccurrence | null> {
+export async function materializeNextSeriesPoll(sourcePollId: string) {
   const located = await db.poll.findUnique({
     where: { id: sourcePollId },
     select: { seriesId: true },
