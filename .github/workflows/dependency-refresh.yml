@@ -6,11 +6,14 @@ on:
       - codex/dependency-security-cleanup
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: dependency-refresh
+  cancel-in-progress: true
 
 jobs:
   refresh:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,23 +23,21 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Migrate React Email imports and refresh lockfile
+      - name: Resolve dependencies and apply non-breaking audit fixes
         run: |
           find emails lib -type f \( -name '*.ts' -o -name '*.tsx' \) -print0 | xargs -0 sed -i 's|"@react-email/components"|"react-email"|g; s|"@react-email/render"|"react-email"|g'
           npm install --package-lock-only --ignore-scripts
-          npm audit --json > dependency-audit.json || true
-      - name: Upload dependency audit
+          npm audit fix --package-lock-only --ignore-scripts || true
+          mkdir -p generated
+          npm audit --json > generated/audit-full.json || true
+          npm audit --omit=dev --json > generated/audit-prod.json || true
+          cp package-lock.json generated/package-lock.json
+          git diff --name-only -- emails lib | while IFS= read -r file; do
+            mkdir -p "generated/$(dirname "$file")"
+            cp "$file" "generated/$file"
+          done
+      - name: Upload generated cleanup files
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-audit
-          path: dependency-audit.json
-      - name: Commit generated dependency changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json emails lib
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "Refresh dependency lockfile and React Email imports [skip ci]"
-          git push origin HEAD:codex/dependency-security-cleanup
+          name: dependency-cleanup-generated
+          path: generated
