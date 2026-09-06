@@ -8,13 +8,15 @@ const NEXT_POLL_INCLUDE = {
   creator: { select: { name: true, email: true } },
 } as const
 
-export interface MaterializedOccurrence {
-  poll: Awaited<ReturnType<typeof findSeriesPoll>>
-  created: boolean
-}
-
 async function findSeriesPoll(id: string) {
   return db.poll.findUnique({ where: { id }, include: NEXT_POLL_INCLUDE })
+}
+
+type SeriesPoll = NonNullable<Awaited<ReturnType<typeof findSeriesPoll>>>
+
+export interface MaterializedOccurrence {
+  poll: SeriesPoll
+  created: boolean
 }
 
 /**
