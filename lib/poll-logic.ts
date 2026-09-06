@@ -1,5 +1,5 @@
-import type { Poll, PollOption, Participant, Vote } from "@/app/generated/prisma/client"
-import { VoteChoice } from "@/app/generated/prisma/enums"
+import type { Poll, PollOption, Participant, Vote } from "../app/generated/prisma/client"
+import { VoteChoice } from "../app/generated/prisma/enums"
 import { selectTimePollWinners } from "./time-poll"
 import { selectPluralityWinners } from "./winner-candidates"
 
