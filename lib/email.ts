@@ -136,6 +136,8 @@ export interface WinnerEmailProps {
   creatorName: string
   pollTitle: string
   winnerLabel: string
+  finalLocation?: string
+  finalNotes?: string
   resultsUrl: string
   icsUrl?: string
   /** Per-recipient One-Click unsubscribe endpoint. */
