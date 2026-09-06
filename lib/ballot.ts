@@ -13,8 +13,11 @@ export type BallotErrorCode =
   | "UNKNOWN_OPTION"
 
 export class BallotError extends Error {
-  constructor(public readonly code: BallotErrorCode) {
+  readonly code: BallotErrorCode
+
+  constructor(code: BallotErrorCode) {
     super(code)
+    this.code = code
   }
 }
 
