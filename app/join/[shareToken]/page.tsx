@@ -1,8 +1,48 @@
+import type { Metadata } from "next"
 import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
 import { JoinForm } from "@/components/join/JoinForm"
 import { creatorDisplayName } from "@/lib/display-name"
 import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ shareToken: string }>
+}): Promise<Metadata> {
+  const { shareToken } = await params
+  const poll = await db.poll.findUnique({
+    where: { shareToken },
+    select: {
+      title: true,
+      description: true,
+      status: true,
+      creator: { select: { name: true, email: true } },
+    },
+  })
+  if (!poll) return { title: "Join a planit poll" }
+
+  const creatorName = creatorDisplayName(poll.creator)
+  const description = poll.status === "OPEN"
+    ? `${creatorName} wants your vote on ${poll.title}. Open the poll, confirm your email, and answer without creating an account.`
+    : `${creatorName}'s poll, ${poll.title}, has closed.`
+
+  return {
+    title: `Vote on ${poll.title}`,
+    description,
+    openGraph: {
+      title: `${creatorName} wants your vote — ${poll.title}`,
+      description: poll.description?.trim() || description,
+      url: `/join/${shareToken}`,
+      type: "website",
+    },
+    twitter: {
+      card: "summary",
+      title: `${creatorName} wants your vote — ${poll.title}`,
+      description: poll.description?.trim() || description,
+    },
+  }
+}
 
 export default async function JoinPage({ params }: { params: Promise<{ shareToken: string }> }) {
   const { shareToken } = await params
