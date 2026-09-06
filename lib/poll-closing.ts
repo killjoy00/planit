@@ -1,6 +1,6 @@
-import type { Participant, Poll, PollOption, Vote } from "../app/generated/prisma/client"
-import { db } from "./db"
-import { determineWinnerCandidates } from "./poll-logic"
+import type { Participant, Poll, PollOption, Vote } from "../app/generated/prisma/client.ts"
+import { db } from "./db.ts"
+import { determineWinnerCandidates } from "./poll-logic.ts"
 
 export const CLOSABLE_POLL_INCLUDE = {
   options: true,
