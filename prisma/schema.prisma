@@ -19,10 +19,10 @@ model Account {
   access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope              String?
+  id_token           String? @db.Text
+  session_state      String?
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -46,17 +46,18 @@ model VerificationToken {
 // ── Creator user ─────────────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
+  id            String            @id @default(cuid())
   name          String?
-  email         String?   @unique
+  email         String?           @unique
   emailVerified DateTime?
   image         String?
   accounts      Account[]
   sessions      Session[]
   groups        Group[]
   polls         Poll[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  series        RecurringSeries[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 }
 
 // ── Persistent friend groups ─────────────────────────────────────────────────
@@ -81,6 +82,32 @@ model GroupMember {
   createdAt DateTime @default(now())
 
   @@unique([groupId, email])
+}
+
+// ── Recurring plan series ────────────────────────────────────────────────────
+
+/// A recurring series is intentionally small: the latest occurrence is the
+/// template. Closing or cancelling one occurrence clones it, shifts any dated
+/// options/deadline by the cadence, and sends the next poll to the same active
+/// participants. That means edits made to the current poll naturally carry
+/// forward instead of drifting from a hidden second template.
+model RecurringSeries {
+  id        String             @id @default(cuid())
+  creatorId String
+  creator   User               @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  cadence   RecurrenceCadence
+  interval  Int                @default(1)
+  active    Boolean            @default(true)
+  polls     Poll[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([creatorId, active])
+}
+
+enum RecurrenceCadence {
+  WEEKLY
+  MONTHLY
 }
 
 // ── Polls ────────────────────────────────────────────────────────────────────
@@ -108,6 +135,10 @@ model Poll {
   /// rather than a no-reply mailbox. Off unless the creator asks for it — it
   /// shows their address to everyone on the guest list.
   replyToCreator    Boolean       @default(false)
+  /// Concrete details that turn a winning option into an actual plan. They are
+  /// included in the result email/page and in calendar exports when present.
+  finalLocation     String?
+  finalNotes        String?       @db.Text
   /// One link the creator can hand out themselves — group chat, SMS, anywhere.
   /// Null on polls created before share links existed; minted on first view.
   /// Unlike a participant token this is public, so it grants nothing on its
@@ -122,8 +153,13 @@ model Poll {
   winnerId       String?
   winner         PollOption?   @relation("PollWinner", fields: [winnerId], references: [id], onDelete: SetNull)
   votes          Vote[]
+  seriesId       String?
+  series         RecurringSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesSequence Int?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  @@unique([seriesId, seriesSequence])
 }
 
 enum PollType {
