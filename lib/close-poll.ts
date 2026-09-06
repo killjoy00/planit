@@ -1,29 +1,19 @@
-import type { Poll, PollOption, Participant, Vote } from "@/app/generated/prisma/client"
+import type { PollOption, Participant } from "../app/generated/prisma/client"
 
 import { db } from "./db"
 import { appUrl } from "./site"
 import { creatorDisplayName } from "./display-name"
-import { determineWinner, determineWinnerCandidates } from "./poll-logic"
+import { determineWinner } from "./poll-logic"
 import { sendWinnerEmails, type DeliveryResult } from "./email"
+import {
+  CLOSABLE_POLL_INCLUDE,
+  closePollRecord,
+  resolvePollTieRecord,
+  type ClosablePoll,
+} from "./poll-closing"
+import { advanceRecurringSeries } from "./recurring-series"
 
-/**
- * Everything closing a poll needs. `CLOSABLE_POLL_INCLUDE` fetches exactly
- * this, so a caller cannot forget a relation and only find out when the
- * announcement goes out with a blank sender name.
- */
-type ClosablePoll = Pick<Poll, "id" | "title" | "type" | "replyToCreator" | "winnerId"> & {
-  options: PollOption[]
-  participants: Participant[]
-  votes: Vote[]
-  creator: { name: string | null; email: string | null }
-}
-
-export const CLOSABLE_POLL_INCLUDE = {
-  options: true,
-  participants: true,
-  votes: true,
-  creator: { select: { name: true, email: true } },
-} as const
+export { CLOSABLE_POLL_INCLUDE } from "./poll-closing"
 
 export interface CloseOutcome {
   /** False when someone else closed the poll first; nothing was sent. */
@@ -33,6 +23,8 @@ export interface CloseOutcome {
   needsDecision: boolean
   winnerCandidates: PollOption[]
   delivery: DeliveryResult
+  /** Newly-created next occurrence for an active recurring series. */
+  nextPollId: string | null
 }
 
 const NOTHING_SENT: DeliveryResult = { sent: [], failed: [], suppressed: [] }
@@ -60,6 +52,8 @@ export async function deliverPollResults(
         creatorName,
         pollTitle: poll.title,
         winnerLabel: winner.label,
+        finalLocation: poll.finalLocation ?? undefined,
+        finalNotes: poll.finalNotes ?? undefined,
         resultsUrl: `${base}/vote/${participant.token}/results`,
         icsUrl: winner.dateValue ? `${base}/api/polls/ics/${poll.id}` : undefined,
         unsubscribeUrl: `${base}/api/unsubscribe/${participant.token}`,
@@ -96,56 +90,60 @@ export async function deliverPollResults(
   return delivery
 }
 
+async function advanceSeriesSafely(pollId: string, source: string): Promise<string | null> {
+  try {
+    return await advanceRecurringSeries(pollId)
+  } catch (error) {
+    // Closing the current decision is authoritative even if preparing the next
+    // occurrence fails. The series can be retried by closing/cancelling logic
+    // only if no next sequence exists, and the unique sequence key prevents a
+    // second poll if a retry races with a successful attempt.
+    console.error(`[${source}] poll ${pollId}: could not advance recurring series`, error)
+    return null
+  }
+}
+
 /**
  * Close a poll and mail everyone the result.
  *
- * This was written out three times — the last vote crossing a threshold, the
- * creator closing by hand, and the deadline cron — which is three copies of the
- * same recipient filter, the same URL building and the same reply-to rule, free
- * to drift apart. They already had: only one of them guarded on the poll still
- * being open.
- *
- * The write is conditional on the poll still being `OPEN`, and a no-op means
- * some other path got there first. Two people voting at the same instant both
- * used to see the threshold met, both close, and both send everyone a winner
- * email — a duplicate announcement to the whole guest list, from a race that
- * gets likelier the larger the poll.
+ * The status transition and winner calculation are delegated to
+ * `closePollRecord`, which holds the same advisory lock as ballot replacement
+ * and re-fetches votes after acquiring it. A vote and a close therefore have a
+ * total order: whichever owns the lock first wins, and the other observes the
+ * committed state rather than writing around it.
  */
 export async function closePollAndAnnounce(
   poll: ClosablePoll,
-  /** Tag for the log line, e.g. "auto-close" — says which path closed it. */
   source: string,
   selectedWinnerId?: string,
 ): Promise<CloseOutcome> {
-  const winnerCandidates = determineWinnerCandidates(poll)
-  const selectedWinner = selectedWinnerId
-    ? winnerCandidates.find((option) => option.id === selectedWinnerId)
-    : undefined
-  if (selectedWinnerId && !selectedWinner) throw new Error("INVALID_WINNER")
-
-  const winner = selectedWinner ?? (winnerCandidates.length === 1 ? winnerCandidates[0] : null)
-
-  const { count } = await db.poll.updateMany({
-    where: { id: poll.id, status: "OPEN" },
-    data: { status: "CLOSED", winnerId: winner?.id ?? null },
-  })
-  if (count === 0) {
-    return { closed: false, winner: null, needsDecision: false, winnerCandidates: [], delivery: NOTHING_SENT }
-  }
-
-  if (!winner) {
+  const record = await closePollRecord(poll.id, selectedWinnerId)
+  if (!record.closed || !record.poll) {
     return {
-      closed: true,
+      closed: false,
       winner: null,
-      needsDecision: winnerCandidates.length > 1,
-      winnerCandidates,
+      needsDecision: false,
+      winnerCandidates: [],
       delivery: NOTHING_SENT,
+      nextPollId: null,
     }
   }
 
-  const delivery = await deliverPollResults(poll, poll.participants, source, winner)
+  const delivery = record.winner
+    ? await deliverPollResults(record.poll, record.poll.participants, source, record.winner)
+    : NOTHING_SENT
+  const nextPollId = record.needsDecision
+    ? null
+    : await advanceSeriesSafely(record.poll.id, source)
 
-  return { closed: true, winner, needsDecision: false, winnerCandidates, delivery }
+  return {
+    closed: true,
+    winner: record.winner,
+    needsDecision: record.needsDecision,
+    winnerCandidates: record.winnerCandidates,
+    delivery,
+    nextPollId,
+  }
 }
 
 /** Choose the winner of a closed tie and send the announcement exactly once. */
@@ -154,18 +152,32 @@ export async function resolvePollTieAndAnnounce(
   selectedWinnerId: string,
   source: string,
 ): Promise<CloseOutcome> {
-  const winnerCandidates = determineWinnerCandidates(poll)
-  const winner = winnerCandidates.find((option) => option.id === selectedWinnerId)
-  if (winnerCandidates.length < 2 || !winner) throw new Error("INVALID_WINNER")
-
-  const { count } = await db.poll.updateMany({
-    where: { id: poll.id, status: "CLOSED", winnerId: null },
-    data: { winnerId: winner.id },
-  })
-  if (count === 0) {
-    return { closed: false, winner: null, needsDecision: false, winnerCandidates: [], delivery: NOTHING_SENT }
+  const record = await resolvePollTieRecord(poll.id, selectedWinnerId)
+  if (!record.closed || !record.poll || !record.winner) {
+    return {
+      closed: false,
+      winner: null,
+      needsDecision: false,
+      winnerCandidates: [],
+      delivery: NOTHING_SENT,
+      nextPollId: null,
+    }
   }
 
-  const delivery = await deliverPollResults(poll, poll.participants, source, winner)
-  return { closed: true, winner, needsDecision: false, winnerCandidates, delivery }
+  const delivery = await deliverPollResults(
+    record.poll,
+    record.poll.participants,
+    source,
+    record.winner,
+  )
+  const nextPollId = await advanceSeriesSafely(record.poll.id, source)
+
+  return {
+    closed: true,
+    winner: record.winner,
+    needsDecision: false,
+    winnerCandidates: record.winnerCandidates,
+    delivery,
+    nextPollId,
+  }
 }
