@@ -13,6 +13,8 @@ interface Props {
   threshold: number | null
   reminderSchedule: "AFTER_SEND" | "BEFORE_DEADLINE"
   replyToCreator: boolean
+  finalLocation: string | null
+  finalNotes: string | null
 }
 
 function localDateTimeValue(value: string | null): string {
@@ -34,6 +36,8 @@ export function PollSettings(props: Props) {
   const [threshold, setThreshold] = useState(props.threshold?.toString() ?? "")
   const [reminderSchedule, setReminderSchedule] = useState(props.reminderSchedule)
   const [replyToCreator, setReplyToCreator] = useState(props.replyToCreator)
+  const [finalLocation, setFinalLocation] = useState(props.finalLocation ?? "")
+  const [finalNotes, setFinalNotes] = useState(props.finalNotes ?? "")
   const [error, setError] = useState("")
 
   async function request(url: string, body: object, method = "POST") {
@@ -57,6 +61,8 @@ export function PollSettings(props: Props) {
           threshold: threshold ? Number(threshold) : null,
           reminderSchedule,
           replyToCreator,
+          finalLocation: finalLocation.trim() || null,
+          finalNotes: finalNotes.trim() || null,
         }, "PATCH")
         setIsEditing(false)
         router.refresh()
@@ -69,7 +75,7 @@ export function PollSettings(props: Props) {
   function changeLifecycle(action: "CANCEL" | "REOPEN") {
     const confirmed = window.confirm(
       action === "CANCEL"
-        ? "Cancel this poll? Existing votes will be kept if you reopen it later."
+        ? "Cancel this poll? Existing votes will be kept if you reopen it later. A recurring series will move on to its next occurrence."
         : "Reopen this poll and continue collecting votes?",
     )
     if (!confirmed) return
@@ -92,7 +98,7 @@ export function PollSettings(props: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-800">Manage poll</h2>
-          <p className="mt-0.5 text-xs text-gray-500">Update the poll, manage its lifecycle, or reuse it.</p>
+          <p className="mt-0.5 text-xs text-gray-500">Update the decision, add the final plan details, manage its lifecycle, or reuse it.</p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm">
           <Link href={`/polls/new?duplicate=${props.pollId}`} className="text-indigo-600 hover:underline">
@@ -127,6 +133,20 @@ export function PollSettings(props: Props) {
                 Description
                 <textarea value={description} maxLength={5000} rows={2} onChange={(event) => setDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" />
               </label>
+              <div className="sm:col-span-2 rounded-lg border border-indigo-100 bg-indigo-50/50 p-3">
+                <p className="text-sm font-medium text-gray-800">Finish the plan</p>
+                <p className="mt-0.5 text-xs text-gray-500">Optional details sent with the winner and included in the calendar file when the poll closes.</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm text-gray-700">
+                    Location or meeting link
+                    <input value={finalLocation} maxLength={300} onChange={(event) => setFinalLocation(event.target.value)} placeholder="The Corner Tap, 123 Main St" className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" />
+                  </label>
+                  <label className="text-sm text-gray-700">
+                    Final notes
+                    <textarea value={finalNotes} maxLength={5000} rows={2} onChange={(event) => setFinalNotes(event.target.value)} placeholder="Reservation is under Jamie. Meet at 6:45." className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" />
+                  </label>
+                </div>
+              </div>
             </>
           )}
           <label className="text-sm text-gray-700">
@@ -157,6 +177,12 @@ export function PollSettings(props: Props) {
               </div>
             </>
           )}
+        </div>
+      )}
+      {props.status !== "OPEN" && (props.finalLocation || props.finalNotes) && (
+        <div className="mt-4 border-t border-gray-100 pt-4 text-sm text-gray-600">
+          {props.finalLocation && <p><span className="font-medium text-gray-800">Where:</span> {props.finalLocation}</p>}
+          {props.finalNotes && <p className="mt-1"><span className="font-medium text-gray-800">Plan:</span> {props.finalNotes}</p>}
         </div>
       )}
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

@@ -4,10 +4,11 @@ import { z } from "zod"
 import { checkThreshold, isMultiSelect } from "@/lib/poll-logic"
 import { CLOSABLE_POLL_INCLUDE, closePollAndAnnounce } from "@/lib/close-poll"
 import { MAX_OPTIONS_PER_POLL } from "@/lib/limits"
+import { BallotError, commitBallot } from "@/lib/ballot"
 
 const schema = z.object({
   /** Selections for a choice poll. A date poll may send several. */
-  optionIds: z.array(z.string()).optional(),
+  optionIds: z.array(z.string()).max(MAX_OPTIONS_PER_POLL).optional(),
   /** Single-selection form of `optionIds`, still sent by older open tabs. */
   optionId: z.string().optional(),
   choice: z.enum(["YES", "FINE", "NO"]).optional(),
@@ -18,123 +19,61 @@ const schema = z.object({
   })).max(MAX_OPTIONS_PER_POLL).optional(),
 })
 
+const ballotMessages: Record<BallotError["code"], { message: string; status: number }> = {
+  NOT_FOUND: { message: "Invalid link", status: 404 },
+  OPTED_OUT: { message: "Opted out", status: 400 },
+  POLL_CLOSED: { message: "Poll is closed", status: 400 },
+  CHOICE_REQUIRED: { message: "Choice required", status: 400 },
+  OPTION_REQUIRED: { message: "Option required", status: 400 },
+  MULTIPLE_NOT_ALLOWED: { message: "Only one option can be selected.", status: 400 },
+  AVAILABILITY_REQUIRED: { message: "Mark at least one time as ideal or workable.", status: 400 },
+  UNKNOWN_OPTION: { message: "Unknown option.", status: 400 },
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
-
-  const participant = await db.participant.findUnique({
-    where: { token },
-    include: { poll: { include: { options: true, votes: true, participants: true } } },
-  })
-
-  if (!participant) return NextResponse.json({ error: "Invalid link" }, { status: 404 })
-  if (participant.optedOut) return NextResponse.json({ error: "Opted out" }, { status: 400 })
-  // Answering again is allowed while the poll is open, and replaces the
-  // previous ballot. Plans change between the invitation and the deadline —
-  // a date stops working, someone reads the description properly — and until
-  // now the only way to correct a mis-tap was to email the creator, who had no
-  // way to edit a ballot either. Once the poll is closed the result has been
-  // announced, so the answer is fixed.
-  if (participant.poll.status !== "OPEN") return NextResponse.json({ error: "Poll is closed" }, { status: 400 })
-  const isChange = participant.votedAt !== null
-
-  const body = await req.json()
-  const parsed = schema.safeParse(body)
+  const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 })
 
-  const { choice } = parsed.data
-  const { poll } = participant
-
-  // One row per selection. `optionId` and `optionIds` mean the same thing; a
-  // vote page loaded before this deployed still sends the singular form.
-  const selectedIds = [
-    ...new Set(parsed.data.optionIds ?? (parsed.data.optionId ? [parsed.data.optionId] : [])),
-  ]
-  const preferences = [...new Map(
-    (parsed.data.preferences ?? []).map((item) => [item.optionId, item]),
-  ).values()]
-
-  if (poll.type === "YES_NO_VETO") {
-    if (!choice) return NextResponse.json({ error: "Choice required" }, { status: 400 })
-  } else if (poll.type === "TIME_POLL") {
-    if (preferences.length === 0) {
-      return NextResponse.json({ error: "Mark at least one time as ideal or workable." }, { status: 400 })
+  let committed
+  try {
+    committed = await commitBallot(token, parsed.data)
+  } catch (error) {
+    if (error instanceof BallotError) {
+      const detail = ballotMessages[error.code]
+      // Keep the old, more useful date-poll wording while the shared mutation
+      // helper owns the actual validation and serialization.
+      if (error.code === "OPTION_REQUIRED") {
+        const participant = await db.participant.findUnique({
+          where: { token },
+          select: { poll: { select: { type: true } } },
+        })
+        return NextResponse.json(
+          { error: participant && isMultiSelect(participant.poll.type) ? "Pick at least one option." : detail.message },
+          { status: detail.status },
+        )
+      }
+      return NextResponse.json({ error: detail.message }, { status: detail.status })
     }
-    const validIds = new Set(poll.options.map((o) => o.id))
-    if (preferences.some(({ optionId }) => !validIds.has(optionId))) {
-      return NextResponse.json({ error: "Unknown option." }, { status: 400 })
-    }
-  } else {
-    if (selectedIds.length === 0) {
-      return NextResponse.json(
-        {
-          error: isMultiSelect(poll.type)
-            ? "Pick at least one option."
-            : "Option required",
-        },
-        { status: 400 },
-      )
-    }
-    if (!isMultiSelect(poll.type) && selectedIds.length > 1) {
-      return NextResponse.json({ error: "Only one option can be selected." }, { status: 400 })
-    }
-    // Never record a vote against an option belonging to some other poll.
-    const validIds = new Set(poll.options.map((o) => o.id))
-    if (selectedIds.some((id) => !validIds.has(id))) {
-      return NextResponse.json({ error: "Unknown option." }, { status: 400 })
-    }
+    throw error
   }
 
-  await db.$transaction([
-    // Replace rather than add: a ballot is the whole of one person's answer,
-    // and on a date poll it is several rows, so the old ones have to go or
-    // dropping a date would leave it still counted.
-    db.vote.deleteMany({ where: { participantId: participant.id } }),
-    db.vote.createMany({
-      data:
-        poll.type === "YES_NO_VETO"
-          ? [{
-              participantId: participant.id,
-              pollId: participant.pollId,
-              optionId: null,
-              choice: choice ?? null,
-            }]
-          : poll.type === "TIME_POLL"
-            ? preferences.map(({ optionId, preference }) => ({
-                participantId: participant.id,
-                pollId: participant.pollId,
-                optionId,
-                choice: null,
-                preference,
-              }))
-          : selectedIds.map((id) => ({
-              participantId: participant.id,
-              pollId: participant.pollId,
-              optionId: id,
-              choice: null,
-              preference: null,
-            })),
-    }),
-    db.participant.update({
-      where: { id: participant.id },
-      data: { votedAt: new Date(), tokenUsed: true },
-    }),
-  ])
-
-  // Re-fetch votes to check threshold
-  const allVotes = await db.vote.findMany({ where: { pollId: participant.pollId } })
-  const shouldAutoClose = checkThreshold(participant.poll, allVotes)
+  // Check the threshold after the atomic replacement. A concurrent close uses
+  // the same poll lock and re-fetches the votes before deciding a winner, so
+  // this check may be stale without ever making the close stale.
+  const allVotes = await db.vote.findMany({ where: { pollId: committed.pollId } })
+  const shouldAutoClose = checkThreshold(
+    { type: committed.pollType, threshold: committed.threshold },
+    allVotes,
+  )
 
   if (shouldAutoClose) {
     const fullPoll = await db.poll.findUnique({
-      where: { id: participant.pollId },
+      where: { id: committed.pollId },
       include: CLOSABLE_POLL_INCLUDE,
     })
-    // A no-op close means another vote landing at the same moment already
-    // announced this result; `closePollAndAnnounce` will not send it twice.
-    if (fullPoll && fullPoll.status === "OPEN") {
-      await closePollAndAnnounce(fullPoll, "threshold")
-    }
+    if (fullPoll) await closePollAndAnnounce(fullPoll, "threshold")
   }
 
-  return NextResponse.json({ ok: true, changed: isChange })
+  return NextResponse.json({ ok: true, changed: committed.changed })
 }

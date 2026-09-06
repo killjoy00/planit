@@ -5,8 +5,11 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { PollResults } from "@/components/poll/PollResults"
 import { PollSettings } from "@/components/poll/PollSettings"
+import { RecurringSeries } from "@/components/poll/RecurringSeries"
+import { PlanCompletion } from "@/components/poll/PlanCompletion"
 import { appUrl } from "@/lib/site"
 import { describeSchedule } from "@/lib/reminder-schedule"
+import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
 
 export default async function PollPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -20,10 +23,18 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
       participants: { include: { votes: true }, orderBy: { createdAt: "asc" } },
       winner: true,
       group: { select: { name: true } },
+      series: { select: { cadence: true, interval: true, active: true } },
     },
   })
 
   if (!poll || poll.creatorId !== userId) notFound()
+
+  const nextOccurrence = poll.seriesId && poll.seriesSequence
+    ? await db.poll.findFirst({
+        where: { seriesId: poll.seriesId, seriesSequence: poll.seriesSequence + 1 },
+        select: { id: true },
+      })
+    : null
 
   // Polls that predate share links have none; mint one the first time their
   // creator looks, so every poll has a link to hand out.
@@ -32,6 +43,12 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
     shareToken = randomUUID()
     await db.poll.update({ where: { id: poll.id }, data: { shareToken } })
   }
+
+  const winnerWhen = poll.winner?.dateValue
+    ? poll.type === "TIME_POLL" && poll.timeZone
+      ? formatTimeSlot(poll.winner.dateValue, poll.winner.endDate, poll.timeZone)
+      : formatDateRange(poll.winner.dateValue, poll.winner.endDate)
+    : null
 
   return (
     <div className="space-y-6">
@@ -44,6 +61,9 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
           <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${
             poll.status === "OPEN" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
           }`}>{poll.status}</span>
+          {poll.series && poll.series.active && (
+            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">Recurring</span>
+          )}
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mt-1">{poll.title}</h1>
         {poll.description && <p className="mt-1 text-gray-600">{poll.description}</p>}
@@ -63,7 +83,28 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
         threshold={poll.threshold}
         reminderSchedule={poll.reminderSchedule}
         replyToCreator={poll.replyToCreator}
+        finalLocation={poll.finalLocation}
+        finalNotes={poll.finalNotes}
       />
+
+      <RecurringSeries
+        pollId={poll.id}
+        status={poll.status}
+        series={poll.series}
+        nextPollId={nextOccurrence?.id ?? null}
+        canConfigure={!nextOccurrence}
+      />
+
+      {poll.status === "CLOSED" && poll.winner && (
+        <PlanCompletion
+          title={poll.title}
+          winnerLabel={poll.winner.label}
+          when={winnerWhen}
+          location={poll.finalLocation}
+          notes={poll.finalNotes}
+          calendarUrl={poll.winner.dateValue ? `/api/polls/ics/${poll.id}` : null}
+        />
+      )}
 
       <PollResults
         pollId={id}
@@ -85,7 +126,7 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
             voted: !!p.votedAt, optedOut: p.optedOut,
             inviteDelivered: !!p.inviteSentAt,
             resultDelivered: !!p.resultSentAt,
-            optionIds: p.votes.map((v) => v.optionId).filter((id): id is string => !!id),
+            optionIds: p.votes.map((v) => v.optionId).filter((optionId): optionId is string => !!optionId),
             choice: p.votes.find((v) => v.choice)?.choice ?? null,
             preferences: p.votes
               .filter((v) => v.optionId && v.preference)

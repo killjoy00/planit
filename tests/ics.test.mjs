@@ -27,3 +27,16 @@ test("date polls export inclusive date ranges as all-day events", () => {
   assert.match(calendar, /DTSTART;VALUE=DATE:20260828/)
   assert.match(calendar, /DTEND;VALUE=DATE:20260831/)
 })
+
+test("calendar exports carry the final location and notes", () => {
+  const calendar = generateICS(
+    "Supper club",
+    new Date("2026-09-12T00:00:00.000Z"),
+    "Reservation under Alex",
+    undefined,
+    true,
+    "The Corner Tap, 123 Main St",
+  )
+  assert.match(calendar, /DESCRIPTION:Reservation under Alex/)
+  assert.match(calendar, /LOCATION:The Corner Tap.*123 Main St/)
+})

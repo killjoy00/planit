@@ -11,6 +11,8 @@ const schema = z.object({
   threshold: z.number().int().positive().max(MAX_INVITEES_PER_POLL).nullable(),
   reminderSchedule: z.enum(["AFTER_SEND", "BEFORE_DEADLINE"]),
   replyToCreator: z.boolean(),
+  finalLocation: z.string().trim().max(300).nullable(),
+  finalNotes: z.string().trim().max(5_000).nullable(),
 })
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -44,6 +46,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       threshold,
       reminderSchedule,
       replyToCreator: parsed.data.replyToCreator,
+      finalLocation: parsed.data.finalLocation || null,
+      finalNotes: parsed.data.finalNotes || null,
       // A changed schedule should get its own full ladder from this point.
       reminderLevel: 0,
       lastReminderAt: null,

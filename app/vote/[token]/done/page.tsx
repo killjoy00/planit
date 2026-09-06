@@ -2,6 +2,7 @@ import Link from "next/link"
 import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
 import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
+import { PlanitPrompt } from "@/components/vote/PlanitPrompt"
 
 export default async function VoteDonePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -36,14 +37,23 @@ export default async function VoteDonePage({ params }: { params: Promise<{ token
         </p>
 
         {poll.status === "CLOSED" && poll.winner ? (
-          <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-6">
-            <p className="text-sm text-indigo-600 font-medium uppercase tracking-wide">Winner</p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{poll.winner.label}</p>
+          <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-6 text-left">
+            <p className="text-center text-sm text-indigo-600 font-medium uppercase tracking-wide">The plan is set</p>
+            <p className="text-center text-xl font-bold text-gray-900 mt-1">{poll.winner.label}</p>
             {poll.winner.dateValue && (
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-center text-sm text-gray-500">
                 {poll.type === "TIME_POLL" && poll.timeZone
                   ? formatTimeSlot(poll.winner.dateValue, poll.winner.endDate, poll.timeZone)
                   : formatDateRange(poll.winner.dateValue, poll.winner.endDate)}
+              </p>
+            )}
+            {poll.finalLocation && <p className="mt-3 text-sm text-gray-700"><strong>Where:</strong> {poll.finalLocation}</p>}
+            {poll.finalNotes && <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{poll.finalNotes}</p>}
+            {poll.winner.dateValue && (
+              <p className="mt-4 text-center">
+                <a href={`/api/polls/ics/${poll.id}`} className="text-sm font-medium text-indigo-600 hover:underline">
+                  Add to calendar
+                </a>
               </p>
             )}
           </div>
@@ -109,6 +119,10 @@ export default async function VoteDonePage({ params }: { params: Promise<{ token
               Change your vote
             </Link>
           )}
+        </div>
+
+        <div className="pt-4 text-left">
+          <PlanitPrompt />
         </div>
       </div>
     </main>

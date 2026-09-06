@@ -31,12 +31,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pol
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
+  const description = [poll.description, poll.finalNotes].filter(Boolean).join("\n\n") || undefined
   const ics = generateICS(
     poll.title,
     poll.winner.dateValue,
-    poll.description ?? undefined,
+    description,
     poll.winner.endDate,
     poll.type === "DATE_POLL",
+    poll.finalLocation ?? undefined,
   )
   return new NextResponse(ics, {
     headers: {

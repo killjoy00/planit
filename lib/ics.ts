@@ -6,6 +6,7 @@ export function generateICS(
   description?: string,
   endDate?: Date | null,
   allDay = false,
+  location?: string,
 ): string {
   const calendar = ical({ name: "planit" })
   let end: Date
@@ -26,6 +27,7 @@ export function generateICS(
     end,
     summary: title,
     description: description ?? "",
+    location: location || undefined,
     allDay,
   })
   return calendar.toString()
