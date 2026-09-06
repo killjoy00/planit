@@ -1,4 +1,4 @@
-import { localDateTimeToUtc, utcToLocalInput } from "./time-zones"
+import { localDateTimeToUtc, utcToLocalInput } from "./time-zones.ts"
 
 export type RecurrenceCadence = "WEEKLY" | "MONTHLY"
 
