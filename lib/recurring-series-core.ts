@@ -1,6 +1,6 @@
-import { db } from "./db"
-import { normalizeContacts } from "./contacts"
-import { shiftPollDate, shiftRecurringDate, type RecurrenceCadence } from "./recurrence"
+import { db } from "./db.ts"
+import { normalizeContacts } from "./contacts.ts"
+import { shiftPollDate, shiftRecurringDate, type RecurrenceCadence } from "./recurrence.ts"
 
 const NEXT_POLL_INCLUDE = {
   options: { orderBy: { order: "asc" } },
