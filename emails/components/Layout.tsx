@@ -5,7 +5,7 @@ import {
   Body,
   Container,
   Font,
-} from "@react-email/components"
+} from "react-email"
 
 interface LayoutProps {
   preview: string
