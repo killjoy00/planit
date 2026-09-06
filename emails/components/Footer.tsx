@@ -1,4 +1,4 @@
-import { Hr, Text, Link } from "@react-email/components"
+import { Hr, Text, Link } from "react-email"
 
 interface FooterProps {
   /** Leave this one plan. */

@@ -1,5 +1,5 @@
 import { Resend } from "resend"
-import { render } from "@react-email/render"
+import { render } from "react-email"
 import InviteEmail from "@/emails/invite"
 import Reminder1Email from "@/emails/reminder-1"
 import Reminder2Email from "@/emails/reminder-2"
