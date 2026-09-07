@@ -59,6 +59,19 @@ export function RecurringSeries({ pollId, status, series, nextPollId, canConfigu
     })
   }
 
+  function retry() {
+    setError("")
+    startTransition(async () => {
+      const response = await fetch(`/api/polls/${pollId}/series/retry`, { method: "POST" })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) {
+        setError(typeof body?.error === "string" ? body.error : "Could not create the next occurrence.")
+        return
+      }
+      router.refresh()
+    })
+  }
+
   const active = !!series?.active
 
   return (
@@ -111,7 +124,12 @@ export function RecurringSeries({ pollId, status, series, nextPollId, canConfigu
         </div>
       )}
       {active && status !== "OPEN" && !nextPollId && (
-        <p className="mt-3 text-xs text-amber-700">The next occurrence has not been created yet. If the last transition failed, closing/cancelling is safe to retry after the underlying issue is fixed.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3 text-xs text-amber-700">
+          <p>The next occurrence has not been created yet &mdash; the last attempt may have failed.</p>
+          <button type="button" onClick={retry} disabled={isPending} className="font-medium text-indigo-600 hover:underline disabled:opacity-50">
+            {isPending ? "Retrying…" : "Retry now"}
+          </button>
+        </div>
       )}
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </section>
