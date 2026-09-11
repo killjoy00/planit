@@ -19,8 +19,11 @@ const AUTH_ERRORS: Record<string, string> = {
   Configuration: "Sign-in is temporarily unavailable. Please try again in a moment.",
 }
 
-/** Where to land after a successful sign-in, when nothing else asked for a page. */
-const DEFAULT_CALLBACK_URL = "/dashboard"
+/**
+ * The start route sends a first-time organizer directly into poll creation and
+ * everyone with an existing poll to the dashboard.
+ */
+const DEFAULT_CALLBACK_URL = "/start"
 
 export function LoginForm() {
   const params = useSearchParams()
@@ -32,9 +35,8 @@ export function LoginForm() {
 
   /**
    * The proxy sends people here as `/login?callbackUrl=<page they wanted>`.
-   * Honour that, and otherwise send them to the dashboard — never let this
-   * default to the current page, or the magic link signs you in and drops you
-   * back on this form, which is indistinguishable from the link having failed.
+   * Honour that, and otherwise use /start so a brand-new organizer does not
+   * land on an empty dashboard before they have made anything.
    */
   const callbackUrl = params.get("callbackUrl") || DEFAULT_CALLBACK_URL
 
@@ -51,9 +53,6 @@ export function LoginForm() {
     try {
       const result = await signIn("resend", { email, redirect: false, callbackUrl })
       if (result?.error) {
-        // Auth.js hands back a code, not a sentence. Printing it raw showed
-        // people "Sign-in failed: AccessDenied", which reads like an
-        // accusation when it is usually just the one-a-minute limit.
         setError(AUTH_ERRORS[result.error] ?? "Something went wrong signing you in. Please try again.")
       } else {
         setSent(true)

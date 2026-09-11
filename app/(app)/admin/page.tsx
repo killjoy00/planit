@@ -11,9 +11,16 @@ interface DailyRow {
   count: bigint
 }
 
-/** `count` rows for every day in the window, zero-filled where the query had nothing. */
+interface ActivationStatsRow {
+  first_poll_with_vote: bigint
+  matured_creators: bigint
+  second_within_30d: bigint
+  repeat_creators: bigint
+  recurring_creators: bigint
+}
+
 function fillDays(rows: DailyRow[], days: number): { date: Date; count: number }[] {
-  const byDay = new Map(rows.map((r) => [new Date(r.day).toDateString(), Number(r.count)]))
+  const byDay = new Map(rows.map((row) => [new Date(row.day).toDateString(), Number(row.count)]))
   const out: { date: Date; count: number }[] = []
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -24,15 +31,14 @@ function fillDays(rows: DailyRow[], days: number): { date: Date; count: number }
   return out
 }
 
+function percent(numerator: number, denominator: number): number | null {
+  return denominator > 0 ? Math.round((numerator / denominator) * 100) : null
+}
+
 export default async function AdminPage() {
   const session = await auth()
-  // A 404, not a 403: same convention as /polls/[id] for a non-owner — it
-  // doesn't confirm to a signed-in stranger that this route exists at all.
   if (!isAdminEmail(session?.user?.email)) notFound()
 
-  // `new Date()`, not `Date.now()` — the lint config here treats the latter as
-  // an impure call this Next.js version won't allow during render (Cache
-  // Components' purity check), even though both read the same system clock.
   const now = new Date()
   const since14d = new Date(now.getTime() - (SERIES_DAYS - 1) * DAY_MS)
   const since7d = new Date(now.getTime() - 7 * DAY_MS)
@@ -58,12 +64,12 @@ export default async function AdminPage() {
     recentPolls,
     userSeriesRaw,
     pollSeriesRaw,
+    newUsers30d,
+    activatedNewUsers30d,
+    successfulClosedPolls,
+    activationStatsRaw,
   ] = await Promise.all([
     db.user.count(),
-    // Signing in and actually planning something are different acts. A `User`
-    // row appears the moment someone completes the magic link, so the total
-    // counts everyone who ever got curious enough to click through; this counts
-    // the ones who went on to create a poll.
     db.user.count({ where: { polls: { some: {} } } }),
     db.group.count(),
     db.poll.count(),
@@ -106,17 +112,67 @@ export default async function AdminPage() {
       from "Poll" where "createdAt" >= ${since14d}
       group by 1 order by 1
     `,
+    db.user.count({ where: { createdAt: { gte: since30d } } }),
+    db.user.count({ where: { createdAt: { gte: since30d }, polls: { some: {} } } }),
+    db.poll.count({ where: { status: "CLOSED", winnerId: { not: null } } }),
+    db.$queryRaw<ActivationStatsRow[]>`
+      with first_polls as (
+        select distinct on ("creatorId") id, "creatorId", "createdAt"
+        from "Poll"
+        order by "creatorId", "createdAt", id
+      )
+      select
+        count(*) filter (
+          where exists (
+            select 1 from "Participant" participant
+            where participant."pollId" = first_polls.id
+              and participant."votedAt" is not null
+              and participant."optedOut" = false
+          )
+        ) as first_poll_with_vote,
+        count(*) filter (where first_polls."createdAt" <= ${since30d}) as matured_creators,
+        count(*) filter (
+          where first_polls."createdAt" <= ${since30d}
+            and exists (
+              select 1 from "Poll" second_poll
+              where second_poll."creatorId" = first_polls."creatorId"
+                and second_poll."createdAt" > first_polls."createdAt"
+                and second_poll."createdAt" <= first_polls."createdAt" + interval '30 days'
+            )
+        ) as second_within_30d,
+        count(*) filter (
+          where exists (
+            select 1 from "Poll" later_poll
+            where later_poll."creatorId" = first_polls."creatorId"
+              and later_poll."createdAt" > first_polls."createdAt"
+          )
+        ) as repeat_creators,
+        count(*) filter (
+          where exists (
+            select 1 from "RecurringSeries" series
+            where series."creatorId" = first_polls."creatorId"
+          )
+        ) as recurring_creators
+      from first_polls
+    `,
   ])
 
-  // Non-opted-out is the honest denominator: someone who opted out was never
-  // going to vote, and counting them against the rate makes every poll with a
-  // dropout look worse than the people still on it actually are.
-  const votableParticipants = totalParticipants - optedOutParticipants
-  const voteRate = votableParticipants > 0 ? Math.round((votedParticipants / votableParticipants) * 100) : 0
+  const activationStats = activationStatsRaw[0] ?? {
+    first_poll_with_vote: BigInt(0),
+    matured_creators: BigInt(0),
+    second_within_30d: BigInt(0),
+    repeat_creators: BigInt(0),
+    recurring_creators: BigInt(0),
+  }
 
-  // How many of the people who signed in went on to plan something. Guarded
-  // because a brand-new deployment has no users to divide by.
-  const creatorRate = totalUsers > 0 ? Math.round((totalCreators / totalUsers) * 100) : 0
+  const votableParticipants = totalParticipants - optedOutParticipants
+  const voteRate = percent(votedParticipants, votableParticipants) ?? 0
+  const creatorRate = percent(totalCreators, totalUsers) ?? 0
+  const firstPollWithVote = Number(activationStats.first_poll_with_vote)
+  const maturedCreators = Number(activationStats.matured_creators)
+  const secondWithin30d = Number(activationStats.second_within_30d)
+  const repeatCreators = Number(activationStats.repeat_creators)
+  const recurringCreators = Number(activationStats.recurring_creators)
 
   const userSeries = fillDays(userSeriesRaw, SERIES_DAYS)
   const pollSeries = fillDays(pollSeriesRaw, SERIES_DAYS)
@@ -140,9 +196,59 @@ export default async function AdminPage() {
         </div>
       </section>
 
+      <section>
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Activation funnel</h2>
+          <p className="mt-1 text-xs text-gray-400">Derived from account, poll, vote, close, and recurrence records already in the database.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ConversionTile
+            label="Signup → first poll"
+            rate={percent(totalCreators, totalUsers)}
+            numerator={totalCreators}
+            denominator={totalUsers}
+            denominatorLabel="signed-in users"
+          />
+          <ConversionTile
+            label="30-day signup cohort"
+            rate={percent(activatedNewUsers30d, newUsers30d)}
+            numerator={activatedNewUsers30d}
+            denominator={newUsers30d}
+            denominatorLabel="new users created a poll"
+          />
+          <ConversionTile
+            label="First poll → first vote"
+            rate={percent(firstPollWithVote, totalCreators)}
+            numerator={firstPollWithVote}
+            denominator={totalCreators}
+            denominatorLabel="first polls got a participant vote"
+          />
+          <ConversionTile
+            label="Poll → successful close"
+            rate={percent(successfulClosedPolls, totalPolls)}
+            numerator={successfulClosedPolls}
+            denominator={totalPolls}
+            denominatorLabel="polls closed with a winner"
+          />
+          <ConversionTile
+            label="Second poll ≤ 30d"
+            rate={percent(secondWithin30d, maturedCreators)}
+            numerator={secondWithin30d}
+            denominator={maturedCreators}
+            denominatorLabel="matured first-poll creators repeated"
+          />
+          <ConversionTile
+            label="Recurring adoption"
+            rate={percent(recurringCreators, repeatCreators)}
+            numerator={recurringCreators}
+            denominator={repeatCreators}
+            denominatorLabel="repeat creators started a series"
+          />
+        </div>
+        <p className="mt-3 text-xs text-gray-400">“Second poll ≤ 30d” only includes creators whose first poll is at least 30 days old, so newer creators are not counted as failures before they have had the full window.</p>
+      </section>
+
       <section className="grid sm:grid-cols-2 gap-8">
-        {/* Counts `User` rows, so it is new sign-ins — not new creators, which
-            is now a narrower thing (see the tiles above). */}
         <DailyBars title="New users" series={userSeries} />
         <DailyBars title="New polls" series={pollSeries} />
       </section>
@@ -155,7 +261,7 @@ export default async function AdminPage() {
               key={row.type}
               label={row.type.replace(/_/g, " ")}
               count={row._count._all}
-              max={Math.max(...pollsByType.map((r) => r._count._all), 1)}
+              max={Math.max(...pollsByType.map((item) => item._count._all), 1)}
             />
           ))}
         </div>
@@ -172,13 +278,9 @@ export default async function AdminPage() {
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Active creators, last 30 days
-        </h2>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Active creators, last 30 days</h2>
         <p className="text-2xl font-bold text-gray-900">{activeCreators30d.length}</p>
-        <p className="mt-0.5 text-xs text-gray-400">
-          Distinct people who created a poll recently, not the all-time {totalCreators} above.
-        </p>
+        <p className="mt-0.5 text-xs text-gray-400">Distinct people who created a poll recently, not the all-time {totalCreators} above.</p>
       </section>
 
       <section>
@@ -197,23 +299,19 @@ export default async function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {recentPolls.map((p) => (
-                <tr key={p.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-2 text-gray-900 max-w-[16rem] truncate">{p.title}</td>
-                  <td className="px-4 py-2 text-gray-500">{p.type.replace(/_/g, " ")}</td>
-                  <td className="px-4 py-2 text-gray-500">{p.status}</td>
-                  <td className="px-4 py-2 text-gray-500">{p.creator.email}</td>
-                  <td className="px-4 py-2 text-gray-500 text-right tabular-nums">{p._count.participants}</td>
-                  <td className="px-4 py-2 text-gray-500 text-right tabular-nums">{p._count.votes}</td>
-                  <td className="px-4 py-2 text-gray-400">{p.createdAt.toLocaleDateString()}</td>
+              {recentPolls.map((poll) => (
+                <tr key={poll.id} className="border-b border-gray-100 last:border-0">
+                  <td className="px-4 py-2 text-gray-900 max-w-[16rem] truncate">{poll.title}</td>
+                  <td className="px-4 py-2 text-gray-500">{poll.type.replace(/_/g, " ")}</td>
+                  <td className="px-4 py-2 text-gray-500">{poll.status}</td>
+                  <td className="px-4 py-2 text-gray-500">{poll.creator.email}</td>
+                  <td className="px-4 py-2 text-gray-500 text-right tabular-nums">{poll._count.participants}</td>
+                  <td className="px-4 py-2 text-gray-500 text-right tabular-nums">{poll._count.votes}</td>
+                  <td className="px-4 py-2 text-gray-400">{poll.createdAt.toLocaleDateString()}</td>
                 </tr>
               ))}
               {recentPolls.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
-                    No polls yet.
-                  </td>
-                </tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No polls yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -223,24 +321,34 @@ export default async function AdminPage() {
   )
 }
 
-function StatTile({
+function StatTile({ label, value, sub, tone }: { label: string; value: number | string; sub?: string; tone?: "warn" }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === "warn" && Number(value) > 0 ? "text-amber-600" : "text-gray-900"}`}>{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-gray-400">{sub}</p>}
+    </div>
+  )
+}
+
+function ConversionTile({
   label,
-  value,
-  sub,
-  tone,
+  rate,
+  numerator,
+  denominator,
+  denominatorLabel,
 }: {
   label: string
-  value: number | string
-  sub?: string
-  tone?: "warn"
+  rate: number | null
+  numerator: number
+  denominator: number
+  denominatorLabel: string
 }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
-      <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === "warn" && Number(value) > 0 ? "text-amber-600" : "text-gray-900"}`}>
-        {value}
-      </p>
-      {sub && <p className="mt-0.5 text-xs text-gray-400">{sub}</p>}
+      <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{rate === null ? "—" : `${rate}%`}</p>
+      <p className="mt-0.5 text-xs text-gray-400">{numerator} of {denominator} {denominatorLabel}</p>
     </div>
   )
 }
@@ -260,15 +368,9 @@ function CountBar({ label, count, max }: { label: string; count: number; max: nu
   )
 }
 
-/**
- * Fourteen daily bars, single hue, magnitude by height. The exact count and
- * date are on `title` — a native browser tooltip — rather than a label on
- * every bar, which would collide at this width; only the endpoints of the
- * range are labelled.
- */
 function DailyBars({ title, series }: { title: string; series: { date: Date; count: number }[] }) {
-  const max = Math.max(...series.map((d) => d.count), 1)
-  const total = series.reduce((sum, d) => sum + d.count, 0)
+  const max = Math.max(...series.map((day) => day.count), 1)
+  const total = series.reduce((sum, day) => sum + day.count, 0)
   return (
     <div>
       <div className="flex items-baseline justify-between mb-2">
@@ -276,12 +378,12 @@ function DailyBars({ title, series }: { title: string; series: { date: Date; cou
         <span className="text-xs text-gray-400">{total} in {series.length} days</span>
       </div>
       <div className="flex items-end gap-1 h-24">
-        {series.map((d, i) => (
+        {series.map((day, index) => (
           <div
-            key={i}
-            title={`${d.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}: ${d.count}`}
+            key={index}
+            title={`${day.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}: ${day.count}`}
             className="flex-1 bg-indigo-500 rounded-t hover:bg-indigo-600 transition-colors"
-            style={{ height: `${Math.max((d.count / max) * 100, d.count > 0 ? 6 : 2)}%` }}
+            style={{ height: `${Math.max((day.count / max) * 100, day.count > 0 ? 6 : 2)}%` }}
           />
         ))}
       </div>
