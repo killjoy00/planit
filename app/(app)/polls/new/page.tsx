@@ -13,7 +13,7 @@ export default async function NewPollPage({
   const userId = session!.user!.id!
   const { duplicate } = await searchParams
 
-  const [groups, user, source] = await Promise.all([
+  const [groups, user, source, pollCount] = await Promise.all([
     db.group.findMany({
       where: { creatorId: userId },
       include: { members: true },
@@ -32,6 +32,7 @@ export default async function NewPollPage({
           },
         })
       : null,
+    db.poll.count({ where: { creatorId: userId } }),
   ])
 
   const template = source
@@ -64,18 +65,29 @@ export default async function NewPollPage({
       }
     : undefined
 
+  const firstRun = !template && pollCount === 0
+
   return (
     <div className="max-w-lg">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">New poll</h1>
+      <h1 className="text-2xl font-bold text-gray-900">
+        {firstRun ? "Make your first poll" : "New poll"}
+      </h1>
+      {firstRun && (
+        <p className="mt-2 mb-6 text-sm text-gray-500">
+          Pick what you need to decide, add the choices, and send it. The extra settings can wait.
+        </p>
+      )}
+      {!firstRun && <div className="mb-6" />}
       <PollWizard
         defaultCreatorName={creatorDisplayName(user)}
         hasSavedName={!!user?.name?.trim()}
         groups={groups.map((g) => ({
-        id: g.id,
-        name: g.name,
-        members: g.members.map((m) => ({ id: m.id, name: m.name, email: m.email })),
-      }))}
+          id: g.id,
+          name: g.name,
+          members: g.members.map((m) => ({ id: m.id, name: m.name, email: m.email })),
+        }))}
         template={template}
+        firstRun={firstRun}
       />
     </div>
   )
