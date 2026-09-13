@@ -5,6 +5,7 @@ import { appUrl } from "./site"
 import { creatorDisplayName } from "./display-name"
 import { determineWinner } from "./poll-logic"
 import { sendWinnerEmails, type DeliveryResult } from "./email"
+import { isFastJoinEmail } from "./fast-join"
 import {
   closePollRecord,
   resolvePollTieRecord,
@@ -15,14 +16,11 @@ import { advanceRecurringSeries } from "./recurring-series"
 export { CLOSABLE_POLL_INCLUDE } from "./poll-closing"
 
 export interface CloseOutcome {
-  /** False when someone else closed the poll first; nothing was sent. */
   closed: boolean
   winner: PollOption | null
-  /** More than one top option closed without an organizer selection. */
   needsDecision: boolean
   winnerCandidates: PollOption[]
   delivery: DeliveryResult
-  /** Newly-created next occurrence for an active recurring series. */
   nextPollId: string | null
 }
 
@@ -44,7 +42,7 @@ export async function deliverPollResults(
   const replyTo = poll.replyToCreator ? poll.creator.email ?? undefined : undefined
   const delivery = await sendWinnerEmails(
     participants
-      .filter((participant) => !participant.optedOut)
+      .filter((participant) => !participant.optedOut && !isFastJoinEmail(participant.email))
       .map((participant) => ({
         participantName: participant.name,
         participantEmail: participant.email,
@@ -93,24 +91,11 @@ async function advanceSeriesSafely(pollId: string, source: string): Promise<stri
   try {
     return await advanceRecurringSeries(pollId)
   } catch (error) {
-    // Closing the current decision is authoritative even if preparing the next
-    // occurrence fails. The series can be retried by closing/cancelling logic
-    // only if no next sequence exists, and the unique sequence key prevents a
-    // second poll if a retry races with a successful attempt.
     console.error(`[${source}] poll ${pollId}: could not advance recurring series`, error)
     return null
   }
 }
 
-/**
- * Close a poll and mail everyone the result.
- *
- * The status transition and winner calculation are delegated to
- * `closePollRecord`, which holds the same advisory lock as ballot replacement
- * and re-fetches votes after acquiring it. A vote and a close therefore have a
- * total order: whichever owns the lock first wins, and the other observes the
- * committed state rather than writing around it.
- */
 export async function closePollAndAnnounce(
   poll: ClosablePoll,
   source: string,
@@ -145,7 +130,6 @@ export async function closePollAndAnnounce(
   }
 }
 
-/** Choose the winner of a closed tie and send the announcement exactly once. */
 export async function resolvePollTieAndAnnounce(
   poll: ClosablePoll,
   selectedWinnerId: string,

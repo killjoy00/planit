@@ -5,6 +5,7 @@ import { z } from "zod"
 import { deliverInvites } from "@/lib/invites"
 import { contactSchema, normalizeContacts } from "@/lib/contacts"
 import { MAX_DISPLAY_NAME, normalizeDisplayName } from "@/lib/display-name"
+import { FAST_JOIN_EMAIL_SUFFIX } from "@/lib/fast-join"
 import {
   MAX_INVITEES_PER_POLL,
   MAX_INVITES_PER_CREATOR_PER_DAY,
@@ -13,7 +14,6 @@ import {
 import { isValidTimeZone } from "@/lib/time-zones"
 
 const schema = z.object({
-  /** How the creator wants to be named in the invitation. Saved for next time. */
   creatorName: z.string().max(MAX_DISPLAY_NAME).optional(),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5_000).optional(),
@@ -25,14 +25,11 @@ const schema = z.object({
     endDate: z.string().datetime().optional(),
   })).min(1).max(MAX_OPTIONS_PER_POLL),
   groupId: z.string().optional(),
-  // Email invitations are optional: a creator may make the poll first and
-  // distribute its public join link through chat, text, or a native share sheet.
   invitees: z.array(contactSchema).max(MAX_INVITEES_PER_POLL),
   deadline: z.string().datetime().optional(),
   threshold: z.number().int().positive().max(MAX_INVITEES_PER_POLL).optional(),
   allowSuggestions: z.boolean().optional(),
   replyToCreator: z.boolean().optional(),
-  /** How nudges are timed. Counting back from a deadline needs one to exist. */
   reminderSchedule: z.enum(["AFTER_SEND", "BEFORE_DEADLINE"]).optional(),
 })
 
@@ -45,9 +42,6 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const { title, description, type, timeZone, options, groupId, invitees, deadline, threshold, allowSuggestions, replyToCreator, reminderSchedule } = parsed.data
-
-  // A group's members and the hand-typed extras overlap all the time, and two
-  // rows for one address is a unique-constraint failure on the whole create.
   const recipients = normalizeContacts(invitees)
   if (deadline && new Date(deadline) <= new Date()) {
     return NextResponse.json({ error: "The deadline must be in the future." }, { status: 400 })
@@ -66,19 +60,10 @@ export async function POST(req: NextRequest) {
   if (allowSuggestions && type !== "SINGLE_CHOICE") {
     return NextResponse.json({ error: "Suggestions are only available for choice polls." }, { status: 400 })
   }
-
-  // Rejected rather than quietly downgraded: a creator who picked
-  // "before the deadline" and got silent creation-time nudges instead would
-  // have no way to tell until the reminders landed at the wrong moment.
   if (reminderSchedule === "BEFORE_DEADLINE" && !deadline) {
-    return NextResponse.json(
-      { error: "Reminders before the deadline need a deadline." },
-      { status: 400 },
-    )
+    return NextResponse.json({ error: "Reminders before the deadline need a deadline." }, { status: 400 })
   }
 
-  // Remember the sender's name on the account, so later polls and the reminder
-  // cron address people the same way without asking again.
   const displayName = normalizeDisplayName(parsed.data.creatorName)
   const poll = await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`poll-send:${session.user.id}`}))`
@@ -87,6 +72,7 @@ export async function POST(req: NextRequest) {
       where: {
         poll: { creatorId: session.user.id },
         createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        NOT: { email: { endsWith: FAST_JOIN_EMAIL_SUFFIX } },
       },
     })
     if (sentRecently + recipients.length > MAX_INVITES_PER_CREATOR_PER_DAY) {
@@ -99,10 +85,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (displayName) {
-      await tx.user.update({
-        where: { id: session.user.id },
-        data: { name: displayName },
-      })
+      await tx.user.update({ where: { id: session.user.id }, data: { name: displayName } })
     }
 
     return tx.poll.create({
@@ -119,15 +102,15 @@ export async function POST(req: NextRequest) {
         replyToCreator: replyToCreator ?? false,
         reminderSchedule: reminderSchedule ?? "AFTER_SEND",
         options: {
-          create: options.map((opt, i) => ({
-            label: opt.label,
-            dateValue: opt.dateValue ? new Date(opt.dateValue) : null,
-            endDate: opt.endDate ? new Date(opt.endDate) : null,
-            order: i,
+          create: options.map((option, index) => ({
+            label: option.label,
+            dateValue: option.dateValue ? new Date(option.dateValue) : null,
+            endDate: option.endDate ? new Date(option.endDate) : null,
+            order: index,
           })),
         },
         participants: recipients.length > 0
-          ? { create: recipients.map((inv) => ({ name: inv.name, email: inv.email })) }
+          ? { create: recipients.map((invitee) => ({ name: invitee.name, email: invitee.email })) }
           : undefined,
       },
       include: {
@@ -150,7 +133,6 @@ export async function POST(req: NextRequest) {
   }
 
   const delivery = await deliverInvites(poll, poll.participants)
-
   return NextResponse.json(
     { id: poll.id, invitesSent: delivery.sent.length, invitesFailed: delivery.failed.length },
     { status: 201 },

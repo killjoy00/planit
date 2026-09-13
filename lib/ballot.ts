@@ -11,6 +11,7 @@ export type BallotErrorCode =
   | "MULTIPLE_NOT_ALLOWED"
   | "AVAILABILITY_REQUIRED"
   | "UNKNOWN_OPTION"
+  | "OPTIONS_CHANGED"
 
 export class BallotError extends Error {
   readonly code: BallotErrorCode
@@ -29,17 +30,10 @@ export interface BallotInput {
     optionId: string
     preference: "IDEAL" | "AVAILABLE"
   }>
+  /** Complete option IDs shown when this ballot was rendered. */
+  knownOptionIds?: string[]
 }
 
-/**
- * Replace a participant's whole ballot atomically.
- *
- * The token lookup happens once to discover the poll lock. Everything that can
- * change the answer — poll status, valid options, the old ballot and the new
- * ballot — is then checked/written again while that poll-wide advisory lock is
- * held. Two tabs become last-write-wins instead of combining into an impossible
- * single-choice ballot, and a close can no longer race a late vote.
- */
 export async function commitBallot(token: string, input: BallotInput) {
   const located = await db.participant.findUnique({
     where: { token },
@@ -58,29 +52,30 @@ export async function commitBallot(token: string, input: BallotInput) {
     if (participant.optedOut) throw new BallotError("OPTED_OUT")
     if (participant.poll.status !== "OPEN") throw new BallotError("POLL_CLOSED")
 
-    const selectedIds = [
-      ...new Set(input.optionIds ?? (input.optionId ? [input.optionId] : [])),
-    ]
+    const selectedIds = [...new Set(input.optionIds ?? (input.optionId ? [input.optionId] : []))]
     const preferences = [...new Map(
       (input.preferences ?? []).map((item) => [item.optionId, item]),
     ).values()]
     const validIds = new Set(participant.poll.options.map((option) => option.id))
 
+    if (input.knownOptionIds) {
+      const knownIds = [...new Set(input.knownOptionIds)]
+      if (knownIds.length !== validIds.size || knownIds.some((optionId) => !validIds.has(optionId))) {
+        throw new BallotError("OPTIONS_CHANGED")
+      }
+    }
+
     if (participant.poll.type === "YES_NO_VETO") {
       if (!input.choice) throw new BallotError("CHOICE_REQUIRED")
     } else if (participant.poll.type === "TIME_POLL") {
       if (preferences.length === 0) throw new BallotError("AVAILABILITY_REQUIRED")
-      if (preferences.some(({ optionId }) => !validIds.has(optionId))) {
-        throw new BallotError("UNKNOWN_OPTION")
-      }
+      if (preferences.some(({ optionId }) => !validIds.has(optionId))) throw new BallotError("UNKNOWN_OPTION")
     } else {
       if (selectedIds.length === 0) throw new BallotError("OPTION_REQUIRED")
       if (!isMultiSelect(participant.poll.type) && selectedIds.length > 1) {
         throw new BallotError("MULTIPLE_NOT_ALLOWED")
       }
-      if (selectedIds.some((optionId) => !validIds.has(optionId))) {
-        throw new BallotError("UNKNOWN_OPTION")
-      }
+      if (selectedIds.some((optionId) => !validIds.has(optionId))) throw new BallotError("UNKNOWN_OPTION")
     }
 
     const isChange = participant.votedAt !== null

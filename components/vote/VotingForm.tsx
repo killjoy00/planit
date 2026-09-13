@@ -18,9 +18,7 @@ interface Props {
   participantName: string
   optOutUrl: string
   allowSuggestions: boolean
-  /** Date polls: every option that works for this person, not just one. */
   multiSelect: boolean
-  /** They have answered before, so this is an edit and says so. */
   hasVoted: boolean
   initialSelectedIds: string[]
   initialChoice: string | null
@@ -59,20 +57,21 @@ export function VotingForm({
 
   function toggleOption(id: string) {
     setError("")
-    setSelectedIds((prev) =>
+    setSelectedIds((previous) =>
       multiSelect
-        ? prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        ? previous.includes(id) ? previous.filter((item) => item !== id) : [...previous, id]
         : [id],
     )
   }
 
   async function handleVote() {
-    const body =
+    const voteBody =
       pollType === "YES_NO_VETO"
         ? { choice }
         : pollType === "TIME_POLL"
           ? { preferences: Object.entries(preferences).map(([optionId, preference]) => ({ optionId, preference })) }
           : { optionIds: selectedIds }
+    const body = { ...voteBody, knownOptionIds: options.map((option) => option.id) }
 
     if (
       pollType === "YES_NO_VETO"
@@ -92,15 +91,18 @@ export function VotingForm({
     setError("")
 
     startTransition(async () => {
-      const res = await fetch(`/api/vote/${token}`, {
+      const response = await fetch(`/api/vote/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
 
-      if (!res.ok) {
-        const data = await res.json()
+      if (!response.ok) {
+        const data = await response.json()
         setError(typeof data.error === "string" ? data.error : "Something went wrong.")
+        if (response.status === 409) {
+          window.setTimeout(() => window.location.reload(), 900)
+        }
         return
       }
       router.push(`/vote/${token}/done`)
@@ -112,20 +114,19 @@ export function VotingForm({
     setIsSuggesting(true)
     setSuggestionError("")
     try {
-      const res = await fetch(`/api/vote/${token}/suggest`, {
+      const response = await fetch(`/api/vote/${token}/suggest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ label: suggestion.trim() }),
       })
-      if (!res.ok) {
-        const data = await res.json()
+      if (!response.ok) {
+        const data = await response.json()
         setSuggestionError(data.error ?? "Could not add suggestion.")
         return
       }
-      const newOpt = await res.json()
-      setOptions((prev) => [...prev, { id: newOpt.id, label: newOpt.label, dateValue: null, endDate: null }])
-      // Someone who proposes an option is saying it works for them.
-      setSelectedIds((prev) => (multiSelect ? [...prev, newOpt.id] : [newOpt.id]))
+      const newOption = await response.json()
+      setOptions((previous) => [...previous, { id: newOption.id, label: newOption.label, dateValue: null, endDate: null }])
+      setSelectedIds((previous) => (multiSelect ? [...previous, newOption.id] : [newOption.id]))
       setSuggestion("")
     } catch {
       setSuggestionError("Something went wrong.")
@@ -145,18 +146,16 @@ export function VotingForm({
             { value: "YES", label: "Yes!", emoji: "✅" },
             { value: "FINE", label: "Fine by me", emoji: "🤷" },
             { value: "NO", label: "Hard no", emoji: "❌" },
-          ].map((opt) => (
+          ].map((option) => (
             <button
-              key={opt.value}
-              onClick={() => { setChoice(opt.value); setError("") }}
+              key={option.value}
+              onClick={() => { setChoice(option.value); setError("") }}
               className={`rounded-xl border-2 py-4 text-center transition-all ${
-                choice === opt.value
-                  ? "border-indigo-500 bg-indigo-50"
-                  : "border-gray-200 bg-white hover:border-gray-300"
+                choice === option.value ? "border-indigo-500 bg-indigo-50" : "border-gray-200 bg-white hover:border-gray-300"
               }`}
             >
-              <div className="text-2xl">{opt.emoji}</div>
-              <div className="mt-1 text-sm font-medium text-gray-700">{opt.label}</div>
+              <div className="text-2xl">{option.emoji}</div>
+              <div className="mt-1 text-sm font-medium text-gray-700">{option.label}</div>
             </button>
           ))}
         </div>
@@ -169,14 +168,8 @@ export function VotingForm({
           {isPending ? "Saving…" : hasVoted ? "Update my answer" : "Submit vote"}
         </button>
         <div className="text-center space-y-2">
-          {hasVoted && (
-            <a href={`/vote/${token}/results`} className="block text-sm text-indigo-600 hover:underline">
-              See where it stands
-            </a>
-          )}
-          <a href={optOutUrl} className="text-sm text-gray-400 hover:text-gray-600 underline">
-            I&apos;m out — remove me from this poll
-          </a>
+          {hasVoted && <a href={`/vote/${token}/results`} className="block text-sm text-indigo-600 hover:underline">See where it stands</a>}
+          <a href={optOutUrl} className="text-sm text-gray-400 hover:text-gray-600 underline">I&apos;m out — remove me from this poll</a>
         </div>
       </div>
     )
@@ -188,13 +181,9 @@ export function VotingForm({
       <div className="space-y-4">
         <div>
           <p className="text-sm font-medium text-gray-700">
-            {hasVoted
-              ? `Your availability, ${firstName} — update any slot:`
-              : `How does each time work, ${firstName}?`}
+            {hasVoted ? `Your availability, ${firstName} — update any slot:` : `How does each time work, ${firstName}?`}
           </p>
-          <p className="mt-0.5 text-sm text-gray-500">
-            Mark the times you can make. Leave the others unavailable.
-          </p>
+          <p className="mt-0.5 text-sm text-gray-500">Mark the times you can make. Leave the others unavailable.</p>
         </div>
         {options.map((option) => {
           const current = preferences[option.id]
@@ -202,9 +191,7 @@ export function VotingForm({
             <div key={option.id} className="rounded-xl border-2 border-gray-200 bg-white p-4">
               <p className="font-medium text-gray-900">{option.label}</p>
               {option.dateValue && timeZone && (
-                <p className="mt-0.5 text-sm text-gray-500">
-                  {formatTimeSlot(option.dateValue, option.endDate, timeZone)}
-                </p>
+                <p className="mt-0.5 text-sm text-gray-500">{formatTimeSlot(option.dateValue, option.endDate, timeZone)}</p>
               )}
               <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label={option.label}>
                 {[
@@ -249,14 +236,8 @@ export function VotingForm({
           {isPending ? "Saving…" : hasVoted ? "Update my availability" : "Submit availability"}
         </button>
         <div className="text-center space-y-2">
-          {hasVoted && (
-            <a href={`/vote/${token}/results`} className="block text-sm text-indigo-600 hover:underline">
-              See where it stands
-            </a>
-          )}
-          <a href={optOutUrl} className="text-sm text-gray-400 hover:text-gray-600 underline">
-            I&apos;m out — remove me from this poll
-          </a>
+          {hasVoted && <a href={`/vote/${token}/results`} className="block text-sm text-indigo-600 hover:underline">See where it stands</a>}
+          <a href={optOutUrl} className="text-sm text-gray-400 hover:text-gray-600 underline">I&apos;m out — remove me from this poll</a>
         </div>
       </div>
     )
@@ -277,41 +258,30 @@ export function VotingForm({
               : `Pick one, ${firstName}:`}
         </p>
         {multiSelect && (
-          <p className="text-sm text-gray-500 mt-0.5">
-            Select as many as you can make — the date that suits the most people wins.
-          </p>
+          <p className="text-sm text-gray-500 mt-0.5">Select as many as you can make — the date that suits the most people wins.</p>
         )}
       </div>
-      {options.map((opt) => {
-        const isSelected = selectedIds.includes(opt.id)
+      {options.map((option) => {
+        const selected = selectedIds.includes(option.id)
         return (
           <button
-            key={opt.id}
+            key={option.id}
             type="button"
             role={multiSelect ? "checkbox" : "radio"}
-            aria-checked={isSelected}
-            onClick={() => toggleOption(opt.id)}
+            aria-checked={selected}
+            onClick={() => toggleOption(option.id)}
             className={`w-full rounded-xl border-2 px-5 py-4 text-left transition-all flex items-center gap-3 ${
-              isSelected
-                ? "border-indigo-500 bg-indigo-50"
-                : "border-gray-200 bg-white hover:border-gray-300"
+              selected ? "border-indigo-500 bg-indigo-50" : "border-gray-200 bg-white hover:border-gray-300"
             }`}
           >
             {multiSelect && (
-              <span
-                aria-hidden
-                className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-md border-2 text-xs font-bold text-white transition-colors ${
-                  isSelected ? "border-indigo-500 bg-indigo-500" : "border-gray-300 bg-white"
-                }`}
-              >
-                {isSelected ? "✓" : ""}
+              <span aria-hidden className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-md border-2 text-xs font-bold text-white transition-colors ${selected ? "border-indigo-500 bg-indigo-500" : "border-gray-300 bg-white"}`}>
+                {selected ? "✓" : ""}
               </span>
             )}
             <span className="min-w-0">
-              <span className="block font-medium text-gray-900">{opt.label}</span>
-              {opt.dateValue && (
-                <span className="block text-sm text-gray-500 mt-0.5">{formatDateRange(opt.dateValue, opt.endDate)}</span>
-              )}
+              <span className="block font-medium text-gray-900">{option.label}</span>
+              {option.dateValue && <span className="block text-sm text-gray-500 mt-0.5">{formatDateRange(option.dateValue, option.endDate)}</span>}
             </span>
           </button>
         )
@@ -319,13 +289,14 @@ export function VotingForm({
       {allowSuggestions && (
         <div className="rounded-xl border-2 border-dashed border-gray-200 px-4 py-3 space-y-2">
           <p className="text-sm font-medium text-gray-600">Don&apos;t see the right option? Suggest one:</p>
+          <p className="text-xs text-gray-400">Suggestions close as soon as the first ballot is submitted, so nobody votes against an outdated list.</p>
           <div className="flex gap-2">
             <input
               type="text"
               placeholder="Your suggestion…"
               value={suggestion}
-              onChange={(e) => setSuggestion(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSuggest()}
+              onChange={(event) => setSuggestion(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && handleSuggest()}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
             />
             <button
@@ -357,14 +328,8 @@ export function VotingForm({
               : "Submit vote"}
       </button>
       <div className="text-center space-y-2">
-        {hasVoted && (
-          <a href={`/vote/${token}/results`} className="block text-sm text-indigo-600 hover:underline">
-            See where it stands
-          </a>
-        )}
-        <a href={optOutUrl} className="text-sm text-gray-400 hover:text-gray-600 underline">
-          I&apos;m out — remove me from this poll
-        </a>
+        {hasVoted && <a href={`/vote/${token}/results`} className="block text-sm text-indigo-600 hover:underline">See where it stands</a>}
+        <a href={optOutUrl} className="text-sm text-gray-400 hover:text-gray-600 underline">I&apos;m out — remove me from this poll</a>
       </div>
     </div>
   )

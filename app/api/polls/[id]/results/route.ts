@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { appUrl } from "@/lib/site"
+import { isFastJoinEmail, participantContactLabel } from "@/lib/fast-join"
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -25,26 +26,32 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     status: poll.status,
     winnerId: poll.winnerId,
     winner: poll.winner,
-    options: poll.options.map((o) => ({
-      id: o.id,
-      label: o.label,
-      dateValue: o.dateValue,
-      endDate: o.endDate,
-      suggestedByName: o.suggestedByName,
-      voteCount: o.votes.length,
-      idealCount: o.votes.filter((v) => v.preference === "IDEAL").length,
+    options: poll.options.map((option) => ({
+      id: option.id,
+      label: option.label,
+      dateValue: option.dateValue,
+      endDate: option.endDate,
+      suggestedByName: option.suggestedByName,
+      voteCount: option.votes.length,
+      idealCount: option.votes.filter((vote) => vote.preference === "IDEAL").length,
     })),
-    participants: poll.participants.map((p) => ({
-      id: p.id, name: p.name, email: p.email,
-      voteUrl: `${appUrl()}/vote/${p.token}`,
-      voted: !!p.votedAt, optedOut: p.optedOut,
-      inviteDelivered: !!p.inviteSentAt,
-      resultDelivered: !!p.resultSentAt,
-      optionIds: p.votes.map((v) => v.optionId).filter((id): id is string => !!id),
-      choice: p.votes.find((v) => v.choice)?.choice ?? null,
-      preferences: p.votes
-        .filter((v) => v.optionId && v.preference)
-        .map((v) => ({ optionId: v.optionId!, preference: v.preference! })),
-    })),
+    participants: poll.participants.map((participant) => {
+      const fastJoin = isFastJoinEmail(participant.email)
+      return {
+        id: participant.id,
+        name: participant.name,
+        email: participantContactLabel(participant.email),
+        voteUrl: `${appUrl()}/vote/${participant.token}`,
+        voted: !!participant.votedAt,
+        optedOut: participant.optedOut,
+        inviteDelivered: fastJoin || !!participant.inviteSentAt,
+        resultDelivered: fastJoin || !!participant.resultSentAt,
+        optionIds: participant.votes.map((vote) => vote.optionId).filter((optionId): optionId is string => !!optionId),
+        choice: participant.votes.find((vote) => vote.choice)?.choice ?? null,
+        preferences: participant.votes
+          .filter((vote) => vote.optionId && vote.preference)
+          .map((vote) => ({ optionId: vote.optionId!, preference: vote.preference! })),
+      }
+    }),
   })
 }

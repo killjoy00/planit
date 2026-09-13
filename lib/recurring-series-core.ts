@@ -1,5 +1,6 @@
 import { db } from "./db.ts"
 import { normalizeContacts } from "./contacts.ts"
+import { isFastJoinEmail } from "./fast-join.ts"
 import { shiftPollDate, shiftRecurringDate, type RecurrenceCadence } from "./recurrence.ts"
 
 const NEXT_POLL_INCLUDE = {
@@ -8,13 +9,6 @@ const NEXT_POLL_INCLUDE = {
   creator: { select: { name: true, email: true } },
 } as const
 
-/**
- * Create exactly one next occurrence for a recurring series.
- *
- * The unique `(seriesId, seriesSequence)` index is the final backstop, while a
- * transaction-scoped advisory lock lets concurrent close/cancel paths observe
- * the same committed state instead of racing into that constraint.
- */
 export async function materializeNextSeriesPoll(sourcePollId: string) {
   const located = await db.poll.findUnique({
     where: { id: sourcePollId },
@@ -44,9 +38,11 @@ export async function materializeNextSeriesPoll(sourcePollId: string) {
 
     const cadence = source.series.cadence as RecurrenceCadence
     const interval = source.series.interval
+    // Fast-join participants intentionally have no deliverable address. A
+    // recurring occurrence can only auto-carry people it can actually reach.
     const recipients = normalizeContacts(
       source.participants
-        .filter((participant) => !participant.optedOut)
+        .filter((participant) => !participant.optedOut && !isFastJoinEmail(participant.email))
         .map((participant) => ({ name: participant.name, email: participant.email })),
     )
 

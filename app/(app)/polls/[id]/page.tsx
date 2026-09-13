@@ -10,6 +10,7 @@ import { PlanCompletion } from "@/components/poll/PlanCompletion"
 import { appUrl } from "@/lib/site"
 import { describeSchedule } from "@/lib/reminder-schedule"
 import { formatDateRange, formatTimeSlot } from "@/lib/time-zones"
+import { isFastJoinEmail, participantContactLabel } from "@/lib/fast-join"
 
 export default async function PollPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -36,8 +37,6 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
       })
     : null
 
-  // Polls that predate share links have none; mint one the first time their
-  // creator looks, so every poll has a link to hand out.
   let shareToken = poll.shareToken
   if (!shareToken) {
     shareToken = randomUUID()
@@ -112,26 +111,29 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
           status: poll.status,
           winnerId: poll.winnerId,
           winner: poll.winner ? { id: poll.winner.id, label: poll.winner.label, dateValue: poll.winner.dateValue?.toISOString() ?? null, endDate: poll.winner.endDate?.toISOString() ?? null } : null,
-          options: poll.options.map((o) => ({
-            id: o.id, label: o.label,
-            dateValue: o.dateValue?.toISOString() ?? null,
-            endDate: o.endDate?.toISOString() ?? null,
-            suggestedByName: o.suggestedByName,
+          options: poll.options.map((option) => ({
+            id: option.id, label: option.label,
+            dateValue: option.dateValue?.toISOString() ?? null,
+            endDate: option.endDate?.toISOString() ?? null,
+            suggestedByName: option.suggestedByName,
             voteCount: 0,
             idealCount: 0,
           })),
-          participants: poll.participants.map((p) => ({
-            id: p.id, name: p.name, email: p.email,
-            voteUrl: `${appUrl()}/vote/${p.token}`,
-            voted: !!p.votedAt, optedOut: p.optedOut,
-            inviteDelivered: !!p.inviteSentAt,
-            resultDelivered: !!p.resultSentAt,
-            optionIds: p.votes.map((v) => v.optionId).filter((optionId): optionId is string => !!optionId),
-            choice: p.votes.find((v) => v.choice)?.choice ?? null,
-            preferences: p.votes
-              .filter((v) => v.optionId && v.preference)
-              .map((v) => ({ optionId: v.optionId!, preference: v.preference! })),
-          })),
+          participants: poll.participants.map((participant) => {
+            const fastJoin = isFastJoinEmail(participant.email)
+            return {
+              id: participant.id, name: participant.name, email: participantContactLabel(participant.email),
+              voteUrl: `${appUrl()}/vote/${participant.token}`,
+              voted: !!participant.votedAt, optedOut: participant.optedOut,
+              inviteDelivered: fastJoin || !!participant.inviteSentAt,
+              resultDelivered: fastJoin || !!participant.resultSentAt,
+              optionIds: participant.votes.map((vote) => vote.optionId).filter((optionId): optionId is string => !!optionId),
+              choice: participant.votes.find((vote) => vote.choice)?.choice ?? null,
+              preferences: participant.votes
+                .filter((vote) => vote.optionId && vote.preference)
+                .map((vote) => ({ optionId: vote.optionId!, preference: vote.preference! })),
+            }
+          }),
         }}
         pollType={poll.type}
         icsAvailable={!!poll.winner?.dateValue}

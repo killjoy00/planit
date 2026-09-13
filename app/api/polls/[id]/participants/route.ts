@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { deliverInvites } from "@/lib/invites"
 import { contactSchema, normalizeContacts } from "@/lib/contacts"
+import { FAST_JOIN_EMAIL_SUFFIX } from "@/lib/fast-join"
 import { MAX_INVITEES_PER_POLL, MAX_INVITES_PER_CREATOR_PER_DAY } from "@/lib/limits"
 
 const schema = z.object({
@@ -24,20 +25,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   })
 
-  if (!poll || poll.creatorId !== session.user.id) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
-  }
-  if (poll.status !== "OPEN") {
-    return NextResponse.json({ error: "Poll is closed" }, { status: 400 })
-  }
+  if (!poll || poll.creatorId !== session.user.id) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  if (poll.status !== "OPEN") return NextResponse.json({ error: "Poll is closed" }, { status: 400 })
 
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 })
 
-  const existingEmails = new Set(poll.participants.map((p) => p.email.toLowerCase()))
+  const existingEmails = new Set(poll.participants.map((participant) => participant.email.toLowerCase()))
   const newInvitees = normalizeContacts(parsed.data.invitees).filter(
-    (i) => !existingEmails.has(i.email),
+    (invitee) => !existingEmails.has(invitee.email),
   )
 
   if (newInvitees.length === 0) {
@@ -53,13 +50,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       where: {
         poll: { creatorId: session.user.id },
         createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        NOT: { email: { endsWith: FAST_JOIN_EMAIL_SUFFIX } },
       },
     })
     if (sentRecently + newInvitees.length > MAX_INVITES_PER_CREATOR_PER_DAY) {
       throw new Error("DAILY_INVITE_LIMIT")
     }
-    return Promise.all(newInvitees.map((inv) =>
-      tx.participant.create({ data: { pollId: poll.id, name: inv.name, email: inv.email } }),
+    return Promise.all(newInvitees.map((invitee) =>
+      tx.participant.create({ data: { pollId: poll.id, name: invitee.name, email: invitee.email } }),
     ))
   }).catch((error: unknown) => {
     if (error instanceof Error && error.message === "DAILY_INVITE_LIMIT") return null
@@ -108,8 +106,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     await tx.participant.delete({ where: { id: participant.id } })
     const active = await tx.participant.count({ where: { pollId: id, optedOut: false } })
     if (poll.threshold && poll.threshold > active) {
-      // Do not silently lower the vote threshold and trigger an unexpected
-      // result; turn auto-close off until the creator picks a new value.
       await tx.poll.update({ where: { id }, data: { threshold: null } })
     }
     return true
