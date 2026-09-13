@@ -1,6 +1,6 @@
 import { PrismaClient } from "../app/generated/prisma/client.ts"
 import { PrismaPg } from "@prisma/adapter-pg"
-import { hardenPostgresSslMode } from "@/lib/postgres-url"
+import { hardenPostgresSslMode } from "./postgres-url.ts"
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL
