@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next"
 import { guides } from "@/lib/guides"
 import { SITE_URL } from "@/lib/site"
+import { useCases } from "@/lib/use-cases"
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const newestGuide = guides
@@ -20,6 +21,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.9,
     },
+    ...useCases.map((item) => ({
+      url: `${SITE_URL}/for/${item.slug}`,
+      changeFrequency: "monthly" as const,
+      priority: 0.9,
+    })),
     {
       url: `${SITE_URL}/guides`,
       lastModified: newestGuide,

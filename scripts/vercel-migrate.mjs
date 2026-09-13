@@ -42,6 +42,14 @@ export const FEATURE_MARKERS = [
   "index:SignInAttempt_purpose_scope_createdAt_idx",
 ]
 
+const LEGACY_SSL_MODE = /([?&])sslmode=(prefer|require|verify-ca)(?=&|$)/i
+const LIBPQ_COMPAT = /([?&])uselibpqcompat=true(?=&|$)/i
+
+function hardenPostgresSslMode(connectionString) {
+  if (LIBPQ_COMPAT.test(connectionString)) return connectionString
+  return connectionString.replace(LEGACY_SSL_MODE, "$1sslmode=verify-full")
+}
+
 export function classifyDatabase({ tables, featureMarkers }) {
   if (tables.has("_prisma_migrations")) {
     return { state: "managed", migrationsToResolve: [] }
@@ -77,10 +85,17 @@ export function classifyDatabase({ tables, featureMarkers }) {
   )
 }
 
+function migrationEnv() {
+  const env = { ...process.env }
+  if (env.DATABASE_URL) env.DATABASE_URL = hardenPostgresSslMode(env.DATABASE_URL)
+  if (env.DATABASE_URL_UNPOOLED) env.DATABASE_URL_UNPOOLED = hardenPostgresSslMode(env.DATABASE_URL_UNPOOLED)
+  return env
+}
+
 function runPrisma(args) {
   const prismaCli = require.resolve("prisma/build/index.js")
   const result = spawnSync(process.execPath, [prismaCli, ...args], {
-    env: process.env,
+    env: migrationEnv(),
     stdio: "inherit",
   })
 
@@ -91,30 +106,30 @@ function runPrisma(args) {
 }
 
 async function inspectDatabase(client) {
-  const [tableResult, columnResult, enumResult, indexResult] = await Promise.all([
-    client.query(
-      `SELECT table_name
-       FROM information_schema.tables
-       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`,
-    ),
-    client.query(
-      `SELECT table_name, column_name
-       FROM information_schema.columns
-       WHERE table_schema = 'public'`,
-    ),
-    client.query(
-      `SELECT type.typname AS type_name, value.enumlabel AS enum_value
-       FROM pg_type AS type
-       JOIN pg_enum AS value ON value.enumtypid = type.oid
-       JOIN pg_namespace AS namespace ON namespace.oid = type.typnamespace
-       WHERE namespace.nspname = 'public'`,
-    ),
-    client.query(
-      `SELECT indexname
-       FROM pg_indexes
-       WHERE schemaname = 'public'`,
-    ),
-  ])
+  // A single pg Client executes one query at a time. Keep these sequential so
+  // pg@9 does not reject the old concurrent-client.query pattern.
+  const tableResult = await client.query(
+    `SELECT table_name
+     FROM information_schema.tables
+     WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`,
+  )
+  const columnResult = await client.query(
+    `SELECT table_name, column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public'`,
+  )
+  const enumResult = await client.query(
+    `SELECT type.typname AS type_name, value.enumlabel AS enum_value
+     FROM pg_type AS type
+     JOIN pg_enum AS value ON value.enumtypid = type.oid
+     JOIN pg_namespace AS namespace ON namespace.oid = type.typnamespace
+     WHERE namespace.nspname = 'public'`,
+  )
+  const indexResult = await client.query(
+    `SELECT indexname
+     FROM pg_indexes
+     WHERE schemaname = 'public'`,
+  )
 
   const tables = new Set(tableResult.rows.map((row) => row.table_name))
   const featureMarkers = new Set([
@@ -136,7 +151,7 @@ export async function migrateProductionDatabase() {
     throw new Error("DATABASE_URL is required for a production deployment.")
   }
 
-  const client = new Client({ connectionString: process.env.DATABASE_URL })
+  const client = new Client({ connectionString: hardenPostgresSslMode(process.env.DATABASE_URL) })
   await client.connect()
 
   try {
