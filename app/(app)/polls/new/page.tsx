@@ -3,15 +3,17 @@ import { db } from "@/lib/db"
 import { PollWizard } from "@/components/poll/PollWizard"
 import { creatorDisplayName } from "@/lib/display-name"
 import { utcToLocalInput } from "@/lib/time-zones"
+import { getUseCase } from "@/lib/use-cases"
 
 export default async function NewPollPage({
   searchParams,
 }: {
-  searchParams: Promise<{ duplicate?: string }>
+  searchParams: Promise<{ duplicate?: string; preset?: string }>
 }) {
   const session = await auth()
   const userId = session!.user!.id!
-  const { duplicate } = await searchParams
+  const { duplicate, preset } = await searchParams
+  const starter = duplicate ? undefined : getUseCase(preset)
 
   const [groups, user, source, pollCount] = await Promise.all([
     db.group.findMany({
@@ -66,18 +68,23 @@ export default async function NewPollPage({
     : undefined
 
   const firstRun = !template && pollCount === 0
+  const heading = starter?.formTitle ?? (firstRun ? "Make your first poll" : "New poll")
+  const intro = starter?.formIntro ?? (firstRun
+    ? "Pick what you need to decide, add the choices, and send it. The extra settings can wait."
+    : undefined)
 
   return (
     <div className="max-w-lg">
-      <h1 className="text-2xl font-bold text-gray-900">
-        {firstRun ? "Make your first poll" : "New poll"}
-      </h1>
-      {firstRun && (
-        <p className="mt-2 mb-6 text-sm text-gray-500">
-          Pick what you need to decide, add the choices, and send it. The extra settings can wait.
-        </p>
+      {starter && (
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">{starter.name}</p>
       )}
-      {!firstRun && <div className="mb-6" />}
+      <h1 className="text-2xl font-bold text-gray-900">{heading}</h1>
+      {intro ? <p className="mt-2 mb-6 text-sm leading-6 text-gray-500">{intro}</p> : <div className="mb-6" />}
+      {starter && (
+        <div className="mb-5 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-800">
+          Best fit: <strong>{starter.starterLabel}</strong>. You can choose a different poll type below if you need one.
+        </div>
+      )}
       <PollWizard
         defaultCreatorName={creatorDisplayName(user)}
         hasSavedName={!!user?.name?.trim()}

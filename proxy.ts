@@ -21,7 +21,7 @@ export function proxy(request: NextRequest) {
 
   if (!sessionToken) {
     const loginUrl = new URL("/login", request.url)
-    loginUrl.searchParams.set("callbackUrl", pathname)
+    loginUrl.searchParams.set("callbackUrl", `${pathname}${search}`)
     return NextResponse.redirect(loginUrl)
   }
 
@@ -31,4 +31,3 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 }
-
