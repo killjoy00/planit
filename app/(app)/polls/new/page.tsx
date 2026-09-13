@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { PollWizard } from "@/components/poll/PollWizard"
 import { creatorDisplayName } from "@/lib/display-name"
+import { isFastJoinEmail } from "@/lib/fast-join"
 import { utcToLocalInput } from "@/lib/time-zones"
 import { getUseCase } from "@/lib/use-cases"
 
@@ -57,10 +58,12 @@ export default async function NewPollPage({
               : `${option.endDate.toISOString().slice(0, 10)}T00:00`
             : "",
         })),
-        invitees: source.participants.map((participant) => ({
-          name: participant.name,
-          email: participant.email,
-        })),
+        invitees: source.participants
+          .filter((participant) => !isFastJoinEmail(participant.email))
+          .map((participant) => ({
+            name: participant.name,
+            email: participant.email,
+          })),
         threshold: source.threshold ? String(source.threshold) : "",
         allowSuggestions: source.allowSuggestions,
         replyToCreator: source.replyToCreator,
@@ -88,10 +91,10 @@ export default async function NewPollPage({
       <PollWizard
         defaultCreatorName={creatorDisplayName(user)}
         hasSavedName={!!user?.name?.trim()}
-        groups={groups.map((g) => ({
-          id: g.id,
-          name: g.name,
-          members: g.members.map((m) => ({ id: m.id, name: m.name, email: m.email })),
+        groups={groups.map((group) => ({
+          id: group.id,
+          name: group.name,
+          members: group.members.map((member) => ({ id: member.id, name: member.name, email: member.email })),
         }))}
         template={template}
         firstRun={firstRun}

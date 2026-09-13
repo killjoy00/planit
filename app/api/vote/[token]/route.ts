@@ -7,16 +7,14 @@ import { MAX_OPTIONS_PER_POLL } from "@/lib/limits"
 import { BallotError, commitBallot } from "@/lib/ballot"
 
 const schema = z.object({
-  /** Selections for a choice poll. A date poll may send several. */
   optionIds: z.array(z.string()).max(MAX_OPTIONS_PER_POLL).optional(),
-  /** Single-selection form of `optionIds`, still sent by older open tabs. */
   optionId: z.string().optional(),
   choice: z.enum(["YES", "FINE", "NO"]).optional(),
-  /** TIME_POLL slots can be ideal or merely workable. Omitted means unavailable. */
   preferences: z.array(z.object({
     optionId: z.string(),
     preference: z.enum(["IDEAL", "AVAILABLE"]),
   })).max(MAX_OPTIONS_PER_POLL).optional(),
+  knownOptionIds: z.array(z.string()).max(MAX_OPTIONS_PER_POLL).optional(),
 })
 
 const ballotMessages: Record<BallotError["code"], { message: string; status: number }> = {
@@ -28,6 +26,7 @@ const ballotMessages: Record<BallotError["code"], { message: string; status: num
   MULTIPLE_NOT_ALLOWED: { message: "Only one option can be selected.", status: 400 },
   AVAILABILITY_REQUIRED: { message: "Mark at least one time as ideal or workable.", status: 400 },
   UNKNOWN_OPTION: { message: "Unknown option.", status: 400 },
+  OPTIONS_CHANGED: { message: "The choices changed while this ballot was open. Reloading the latest version…", status: 409 },
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -41,8 +40,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   } catch (error) {
     if (error instanceof BallotError) {
       const detail = ballotMessages[error.code]
-      // Keep the old, more useful date-poll wording while the shared mutation
-      // helper owns the actual validation and serialization.
       if (error.code === "OPTION_REQUIRED") {
         const participant = await db.participant.findUnique({
           where: { token },
@@ -58,9 +55,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     throw error
   }
 
-  // Check the threshold after the atomic replacement. A concurrent close uses
-  // the same poll lock and re-fetches the votes before deciding a winner, so
-  // this check may be stale without ever making the close stale.
   const allVotes = await db.vote.findMany({ where: { pollId: committed.pollId } })
   const shouldAutoClose = checkThreshold(
     { type: committed.pollType, threshold: committed.threshold },

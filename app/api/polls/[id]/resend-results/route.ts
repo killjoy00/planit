@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { CLOSABLE_POLL_INCLUDE, deliverPollResults } from "@/lib/close-poll"
 import { db } from "@/lib/db"
+import { isFastJoinEmail } from "@/lib/fast-join"
 import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -16,9 +17,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "This poll has no result to resend." }, { status: 400 })
   }
 
-  const pending = poll.participants.filter((participant) => !participant.optedOut && !participant.resultSentAt)
+  const pending = poll.participants.filter(
+    (participant) => !participant.optedOut && !participant.resultSentAt && !isFastJoinEmail(participant.email),
+  )
   if (pending.length === 0) {
-    return NextResponse.json({ error: "Every result has already been delivered." }, { status: 400 })
+    return NextResponse.json({ error: "Every email result has already been delivered." }, { status: 400 })
   }
 
   const delivery = await deliverPollResults(poll, pending, "resend-results")

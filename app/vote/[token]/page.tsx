@@ -30,24 +30,17 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
           <p className="text-2xl">🔒</p>
           <h1 className="text-xl font-bold text-gray-900">This poll is closed</h1>
           <p className="text-gray-500">Voting has ended.</p>
-          <a href={`/vote/${token}/results`} className="inline-block text-sm text-indigo-600 hover:underline">
-            See the result
-          </a>
+          <a href={`/vote/${token}/results`} className="inline-block text-sm text-indigo-600 hover:underline">See the result</a>
         </div>
       </main>
     )
   }
 
-  const voted = participant.poll.participants.filter((p) => p.votedAt && !p.optedOut).length
-  const total = participant.poll.participants.filter((p) => !p.optedOut).length
-
-  // Someone who has already answered gets their ballot back, filled in, rather
-  // than a dead end — the poll is still open, so their answer can still change.
+  const voted = participant.poll.participants.filter((person) => person.votedAt && !person.optedOut).length
+  const total = participant.poll.participants.filter((person) => !person.optedOut).length
   const hasVoted = participant.votedAt !== null
-  const selectedIds = participant.votes
-    .map((v) => v.optionId)
-    .filter((id): id is string => !!id)
-  const choice = participant.votes.find((v) => v.choice)?.choice ?? null
+  const selectedIds = participant.votes.map((vote) => vote.optionId).filter((id): id is string => !!id)
+  const choice = participant.votes.find((vote) => vote.choice)?.choice ?? null
   const preferences = participant.votes
     .filter((vote): vote is typeof vote & { optionId: string; preference: "IDEAL" | "AVAILABLE" } =>
       !!vote.optionId && !!vote.preference,
@@ -64,24 +57,22 @@ export default async function VotePage({ params }: { params: Promise<{ token: st
               : `${creatorDisplayName(participant.poll.creator)} wants your vote`}
           </p>
           <h1 className="text-2xl font-bold text-gray-900 mt-1">{participant.poll.title}</h1>
-          {participant.poll.description && (
-            <p className="mt-2 text-gray-600">{participant.poll.description}</p>
-          )}
+          {participant.poll.description && <p className="mt-2 text-gray-600">{participant.poll.description}</p>}
           <p className="mt-3 text-sm text-gray-400">{voted} of {total} have voted</p>
         </div>
 
         <VotingForm
           token={token}
           pollType={participant.poll.type}
-          options={participant.poll.options.map((o) => ({
-            id: o.id,
-            label: o.label,
-            dateValue: o.dateValue ? o.dateValue.toISOString() : null,
-            endDate: o.endDate ? o.endDate.toISOString() : null,
+          options={participant.poll.options.map((option) => ({
+            id: option.id,
+            label: option.label,
+            dateValue: option.dateValue ? option.dateValue.toISOString() : null,
+            endDate: option.endDate ? option.endDate.toISOString() : null,
           }))}
           participantName={participant.name}
           optOutUrl={`/vote/${token}/opted-out`}
-          allowSuggestions={participant.poll.allowSuggestions}
+          allowSuggestions={participant.poll.allowSuggestions && voted === 0}
           multiSelect={isMultiSelect(participant.poll.type)}
           hasVoted={hasVoted}
           initialSelectedIds={selectedIds}
