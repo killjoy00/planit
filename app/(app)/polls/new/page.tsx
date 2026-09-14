@@ -19,6 +19,7 @@ export default async function NewPollPage({
   const starter = duplicate ? undefined : getUseCase(preset)
   const cookieStore = await cookies()
   const attribution = parseAttribution(cookieStore.get(ACQUISITION_COOKIE)?.value)
+    ?? (starter ? { source: "use-case", useCase: starter.slug } : { source: "direct" })
 
   const [groups, user, source, pollCount] = await Promise.all([
     db.group.findMany({
@@ -48,7 +49,7 @@ export default async function NewPollPage({
     db.poll.count({ where: { creatorId: userId } }),
   ])
 
-  if (attribution && user && (!user.acquisitionSource || !user.acquisitionCampaign || !user.acquisitionUseCase)) {
+  if (user && (!user.acquisitionSource || !user.acquisitionCampaign || !user.acquisitionUseCase)) {
     const data = {
       ...(!user.acquisitionSource ? { acquisitionSource: attribution.source } : {}),
       ...(!user.acquisitionCampaign && attribution.campaign ? { acquisitionCampaign: attribution.campaign } : {}),
