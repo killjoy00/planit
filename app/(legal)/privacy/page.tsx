@@ -42,6 +42,13 @@ export default function PrivacyPage() {
           build.
         </p>
         <p>
+          <strong className="text-gray-900">Acquisition attribution:</strong> if you arrive with
+          campaign parameters such as a source or campaign name, or enter through one of our use-case
+          pages, we may keep normalized source, campaign, and use-case labels so we can understand which
+          entry points lead to an actual poll. We do not store the raw referrer URL or an IP address for
+          acquisition analytics.
+        </p>
+        <p>
           <strong className="text-gray-900">Abuse-protection records:</strong> for public
           sign-in, verified-email join, and Fast Join requests, we temporarily record a timestamp
           and, when available, the source IP address and public-link scope involved. When the request
@@ -50,9 +57,10 @@ export default function PrivacyPage() {
           They are automatically pruned after two days.
         </p>
         <p>
-          We do not collect payment details, and we do not run analytics or tracking
-          software of our own. As with any hosted web service, our infrastructure providers may
-          process ordinary request and security logs as part of operating the service.
+          We do not collect payment details, and we do not use third-party analytics or behavioral
+          tracking software. We use only the limited first-party acquisition attribution described
+          above. As with any hosted web service, our infrastructure providers may process ordinary
+          request and security logs as part of operating the service.
         </p>
       </Section>
 
@@ -62,6 +70,11 @@ export default function PrivacyPage() {
           links; poll invitations and reminders; verified-email join confirmation; and final results.
           Name-only Fast Join voters are not emailed. We do not send marketing email and we do not
           sell or rent email addresses to anyone.
+        </p>
+        <p>
+          Acquisition labels are used only to compare product entry points with first-poll activation,
+          participant voting, successful closes, and repeat use. They are not used to personalize the
+          product, build advertising profiles, or identify a person&apos;s browsing history.
         </p>
         <p>
           Every email invitation and reminder contains a one-click opt-out link. Using it stops
@@ -111,6 +124,12 @@ export default function PrivacyPage() {
           does not require a creator account session.
         </p>
         <p>
+          If a page contains a campaign source, campaign name, or use-case signal, planit may also set
+          a first-party acquisition cookie for up to 30 days. It contains only normalized source,
+          campaign, and use-case labels and exists so a later sign-in and first poll can be attributed
+          to the entry point that led there. It does not contain a raw referrer URL or IP address.
+        </p>
+        <p>
           Advertising cookies are separate. We use Google AdSense to display ads, and only
           on our published pages — the home page, the guides, the FAQ, and this site&apos;s
           other articles. No ads are shown inside the signed-in app, on voting or
@@ -149,9 +168,10 @@ export default function PrivacyPage() {
 
       <Section heading="Retention and deletion">
         <p>
-          Polls, votes, participant records, and group member lists are kept until they are deleted.
-          A poll creator can delete their groups from within the app. Rate-limit records used to
-          protect public forms are automatically deleted after two days.
+          Polls, votes, participant records, group member lists, and saved acquisition labels are kept
+          until they are deleted. A poll creator can delete their groups from within the app. Rate-limit
+          records used to protect public forms are automatically deleted after two days. The temporary
+          acquisition cookie expires after no more than 30 days.
         </p>
         <p>
           To have your account or participant record removed entirely, email{" "}
