@@ -8,14 +8,14 @@ import { useCases } from "@/lib/use-cases"
 export const metadata: Metadata = {
   title: "planit — group polls people actually answer",
   description:
-    "Free group polls for picking dates, places, and plans. Your friends vote straight from their email — no account, no app, no endless group chat.",
+    "Free group polls for picking dates, places, and plans. Share one link and friends can vote by name — no account, no app, no endless group chat.",
   alternates: { canonical: "/" },
 }
 
 const STEPS = [
   ["1", "Ask one concrete question", "Pick dates, times, or a short list of real options. The group answers the same thing in the same place."],
-  ["2", "Send it once", "Invite people by email or share one secure join link. Voters do not need an account."],
-  ["3", "Let the decision finish", "Reminders go only to the people who still owe an answer, then you close on a result."],
+  ["2", "Send it once", "Invite people by email or share one join link. Shared-link voters can enter a name and vote immediately; no account required."],
+  ["3", "Let the decision finish", "Email invitees get targeted reminders. Everyone can come back to the shared link for the final plan."],
 ]
 
 export default async function HomePage() {
@@ -33,7 +33,7 @@ export default async function HomePage() {
             Group plans without the follow-up job
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-gray-600 sm:text-xl">
-            Pick a date or a plan, send it once, and let planit collect the answers. Your friends vote without an account; reminders handle the holdouts.
+            Pick a date or a plan, send it once, and let planit collect the answers. Friends can vote with just a name; use email invitations when you want reminders and results delivered.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/polls/new" className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-7 py-3 text-base font-semibold text-white hover:bg-indigo-700">

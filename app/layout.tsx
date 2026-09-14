@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: `%s — ${SITE_NAME}`,
   },
   description:
-    "Free group polls for picking dates, places, and plans. Your friends vote from their email — no account, no app, no group chat scrollback.",
+    "Free group polls for picking dates, places, and plans. Share one link and friends can vote by name — no account, no app, no group chat scrollback.",
   applicationName: SITE_NAME,
   openGraph: {
     siteName: SITE_NAME,

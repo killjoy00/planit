@@ -39,12 +39,12 @@ export default function DemoPage() {
         <div className="mt-16 border-t border-gray-100 pt-12">
           <h2 className="text-xl font-bold text-gray-900">What just happened</h2>
           <p className="mt-3 text-gray-600">
-            The ballot above is the real DATE_POLL screen a planit invitee opens from their email
-            &mdash; the only difference is that a live poll goes out by mail, to a private link,
-            and this one runs entirely in your browser. Every tick you made was tallied against
-            two other votes that were already in: Bo picked Monday and Wednesday, Cy picked
-            Tuesday and Wednesday. Whichever date collects the most ticks wins; a tie goes to
-            whichever date comes first, the same rule a real poll uses to avoid a runoff nobody
+            The ballot above is the real DATE_POLL screen. On a live poll, a friend can reach it
+            immediately from the shared link after entering their name, or jump straight to it from
+            a personal email invitation. This demo runs entirely in your browser. Every tick you made
+            was tallied against two other votes that were already in: Bo picked Monday and Wednesday,
+            Cy picked Tuesday and Wednesday. Whichever date collects the most ticks wins; a tie goes
+            to whichever date comes first, the same rule a real poll uses to avoid a runoff nobody
             asked for.
           </p>
           <p className="mt-4 text-gray-600">
@@ -53,9 +53,9 @@ export default function DemoPage() {
             <Link href="/about" className="text-indigo-600 hover:underline">
               usage numbers
             </Link>{" "}
-            behind the product. A real poll works the same way, minus the make-believe
-            participants: your invitees vote from their own private links, and you get one result
-            everyone can see.
+            behind the product. A real poll uses the same ballot: people can arrive through the
+            shared Fast Join link or through their personal voting link, and the organizer gets one
+            result everyone can return to.
           </p>
           <p className="mt-6 text-sm text-gray-500">
             More on the mechanics:{" "}

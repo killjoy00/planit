@@ -317,8 +317,8 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
           <div>
             <p className="text-sm font-medium text-gray-700">Public join link</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              New people can request access with this link after confirming their email.
-              To send an invited person straight to their ballot, copy their personal link below.
+              Anyone with this link can enter their name and vote immediately. Email is optional for
+              reminders and result delivery; invited participants&apos; personal links go straight to the ballot.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">

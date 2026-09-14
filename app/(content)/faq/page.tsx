@@ -24,13 +24,13 @@ const FAQS: { section: string; items: Faq[] }[] = [
         a: (
           <p>
             No. Only the person creating a poll signs in, and that is a magic link rather than a
-            password. Everyone invited votes from a private link in their email &mdash; no signup,
-            no app, no password reset at eleven at night. That one detail is the difference between
-            a poll that gets nine replies and one that gets four.
+            password. Anyone opening the shared poll link can enter their name and vote right away.
+            Email is optional: use it when you want a personal voting link, reminders, and the final
+            result delivered to that person. No voter signup and no app required.
           </p>
         ),
         text:
-          "No. Only the poll creator signs in, using a magic link rather than a password. Everyone invited votes from a private link in their email, with no signup and no app.",
+          "No. Only the poll creator signs in. Anyone opening the shared poll link can enter their name and vote immediately; email is optional for personal links, reminders, and result delivery.",
       },
       {
         q: "How many options should a poll have?",
@@ -79,31 +79,31 @@ const FAQS: { section: string; items: Faq[] }[] = [
         q: "How do reminders work?",
         a: (
           <p>
-            Up to three, escalating in directness, and then they stop. Anyone who has voted or
-            opted out is dropped from the reminder list immediately. Reminders that repeat
-            themselves forever are what make organizing feel like nagging, so the sequence is
-            deliberately finite.{" "}
-            <Link href="/guides/follow-up-without-nagging">
+            Up to three, escalating in directness, and then they stop. Automatic reminders only go
+            to people who joined with an email address, either because the organizer invited them
+            directly or because they chose verified-email join. Anyone who has voted or opted out is
+            dropped from the reminder list immediately. Name-only Fast Join voters are never emailed.
+            {" "}<Link href="/guides/follow-up-without-nagging">
               How to write a follow-up that works
             </Link>
             .
           </p>
         ),
         text:
-          "Up to three reminders, escalating in directness, then they stop. Anyone who has voted or opted out stops receiving them immediately.",
+          "Up to three reminders, escalating in directness, then they stop. Reminders only go to email-enabled participants; name-only Fast Join voters are never emailed.",
       },
       {
         q: "Can someone say no without explaining themselves?",
         a: (
           <p>
-            Every invitation carries a one-tap way out. Opting out removes that person from
-            reminders straight away and tells everyone else to stop waiting on them. A fast no is
-            far more useful to a group than a slow maybe, so declining is treated as a real answer
-            rather than a failure.
+            Yes. Every ballot has an &ldquo;I&apos;m out&rdquo; option, and email invitations also
+            carry a one-tap opt-out. Opting out removes that person from reminders straight away and
+            tells everyone else to stop waiting on them. A fast no is far more useful to a group than
+            a slow maybe, so declining is treated as a real answer rather than a failure.
           </p>
         ),
         text:
-          "Yes. Every invitation has a one-tap opt-out, which removes that person from reminders immediately and lets the rest of the group stop waiting.",
+          "Yes. Every ballot has an opt-out, and email invitations also include a one-tap opt-out. It removes that person from reminders immediately and lets the group stop waiting.",
       },
       {
         q: "Do I have to rebuild the guest list every time?",
@@ -112,24 +112,26 @@ const FAQS: { section: string; items: Faq[] }[] = [
             No &mdash; groups persist. Add your people once and every poll after that is a two-step
             job: pick the group, send it. You can add participants to an open poll if you forgot
             someone, and their invitation goes out immediately. Or create without a guest list and
-            share the public join link through text or group chat instead.
+            share the public join link through text or group chat; people can enter their name and
+            vote immediately, with verified email available if they want reminders and result delivery.
           </p>
         ),
         text:
-          "No. Groups persist, so you add people once and reuse the group for every later poll. You can also create without invitees and share a public join link.",
+          "No. Groups persist, so you can reuse a saved guest list. You can also create without invitees and share a public join link that lets people vote by name immediately.",
       },
       {
         q: "What happens when a poll closes?",
         a: (
           <p>
-            The winning option is announced to everyone who took part, and you can download a
-            calendar file for it. If a poll reaches its deadline it closes automatically; you can
-            also close one early once the answer is obvious. If the top options are tied, planit
-            waits for the organizer to choose the winner before sending the announcement.
+            The same shared link becomes the final-plan page, showing the winning option and any
+            date, time, location, or notes the organizer added. Participants who joined with email
+            also get the result delivered to their inbox, and date or time plans can be downloaded
+            as a calendar file. If the top options are tied, planit waits for the organizer to choose
+            the winner before publishing and sending the final result.
           </p>
         ),
         text:
-          "The winning option is announced to everyone who took part and can be downloaded as a calendar file. If top options tie, the organizer chooses before the announcement is sent.",
+          "The shared link becomes the final-plan page. Email-enabled participants also receive the result, and date or time plans can be downloaded as a calendar file. Ties wait for the organizer to choose a winner.",
       },
       {
         q: "Can voters see how everyone else voted?",
@@ -137,7 +139,8 @@ const FAQS: { section: string; items: Faq[] }[] = [
           <p>
             Results show the standings once you have voted, so people can see how the group is
             leaning without that information shaping their own answer beforehand. The organizer sees
-            who has and has not responded, which is what makes a targeted reminder possible.
+            who has and has not responded, which is what makes a targeted reminder possible for
+            email-enabled participants.
           </p>
         ),
         text:
@@ -176,39 +179,42 @@ const FAQS: { section: string; items: Faq[] }[] = [
         q: "What do you do with my friends' email addresses?",
         a: (
           <p>
-            They are used to send that poll&rsquo;s invitation, its reminders, and its result.
-            Nothing else. They are not sold, not shared with advertisers, and not added to any
-            mailing list. See the <Link href="/privacy">privacy policy</Link> for specifics.
+            Email is optional for voters. If you invite someone by email, or they choose the
+            verified-email join option, the address is used only for that poll&apos;s verification or
+            invitation, reminders, and final result. It is not sold, shared with advertisers, or
+            added to a mailing list. See the <Link href="/privacy">privacy policy</Link> for specifics.
           </p>
         ),
         text:
-          "They are used to send the poll invitation, its reminders, and its result, and nothing else. They are not sold, shared with advertisers, or added to a mailing list.",
+          "Email is optional for voters. When it is provided, it is used only for that poll's verification or invitation, reminders, and final result; it is not sold, shared with advertisers, or added to a mailing list.",
       },
       {
         q: "Is the voting link private?",
         a: (
           <p>
-            Each participant gets their own unguessable link, which is how voting works without an
-            account. Treat it like a personal link: anyone you forward it to could vote as you.
-            Voting pages are excluded from search engines.
+            There are two kinds of links. The public join link is meant to be shared with the group;
+            it lets someone create their own name-based ballot. A personal ballot link is unique and
+            unguessable and should be treated as private &mdash; anyone you forward that personal
+            link to could vote as you. Voting pages are excluded from search engines.
           </p>
         ),
         text:
-          "Each participant gets their own unguessable link, which is what allows voting without an account. Anyone you forward it to could vote as you. Voting pages are excluded from search engines.",
+          "The public join link is meant to be shared and creates a name-based ballot. Personal ballot links are unique and unguessable and should not be forwarded. Voting pages are excluded from search engines.",
       },
       {
         q: "Can I delete a group or have my data removed?",
         a: (
           <p>
             You can delete a group from inside the app, which removes its saved participant list.
-            To have an account, or your name and email as a participant, removed entirely, email{" "}
-            <a href="mailto:privacy@planitnow.us">privacy@planitnow.us</a> from that address. Mail
-            that has already been delivered obviously still sits in people&rsquo;s inboxes. The{" "}
+            To have an account or participant record removed entirely, email{" "}
+            <a href="mailto:privacy@planitnow.us">privacy@planitnow.us</a>. If the record is tied to
+            an email address, contact us from that address when possible; for name-only Fast Join,
+            include enough poll context for us to identify the record. The{" "}
             <Link href="/privacy">privacy policy</Link> has the details.
           </p>
         ),
         text:
-          "You can delete a group from inside the app, which removes its saved participant list. To have an account or your details as a participant removed entirely, email privacy@planitnow.us from that address.",
+          "You can delete a group from inside the app. To remove an account or participant record, contact privacy@planitnow.us; include enough poll context to identify name-only Fast Join records.",
       },
     ],
   },
