@@ -4,7 +4,7 @@ import { Prose, Section } from "@/components/ui/Prose"
 
 export const metadata: Metadata = {
   title: "About",
-  description: "Why planit exists, how group voting by email works, and who builds it.",
+  description: "Why planit exists, how low-friction group voting works, and who builds it.",
   alternates: { canonical: "/about" },
 }
 
@@ -34,23 +34,24 @@ export default function AboutPage() {
         </p>
         <p>
           <strong className="text-gray-900">Reminders escalate, then stop.</strong> Up
-          to three nudges that get progressively more direct, and then the group moves
-          forward without the stragglers. No infinite pestering.
+          to three nudges that get progressively more direct for people who joined with email,
+          and then the group moves forward without the stragglers. No infinite pestering.
         </p>
         <p>
           <strong className="text-gray-900">&quot;I&apos;m out&quot; is a real
-          answer.</strong> Every invitation has a one-click opt-out. Opting out removes
-          you from reminders immediately and lets everyone else stop waiting on you.
-          Declining should be as easy as accepting.
+          answer.</strong> Every ballot has a clean way to opt out, and email invitations include
+          a one-click opt-out too. Opting out removes you from reminders immediately and lets
+          everyone else stop waiting on you. Declining should be as easy as accepting.
         </p>
       </Section>
 
       <Section heading="Voters don&apos;t need an account">
         <p>
-          Only the person creating a poll signs in, and even that is just a magic link —
-          no password. Everyone invited votes straight from their email through a private
-          link. No signup, no app, no password reset at 11pm. That single detail is why
-          people actually respond.
+          Only the person creating a poll signs in, and even that is just a magic link — no
+          password. A friend who opens the shared poll link can enter their name and go straight
+          to the ballot. If you invite someone by email, their personal link skips even that join
+          step and lets planit send reminders and the final result. No voter signup, no app, no
+          password reset at 11pm.
         </p>
       </Section>
 
