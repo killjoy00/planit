@@ -1,1 +1,0 @@
-Acquisition funnel is admin-only and stores no raw referrer URL.

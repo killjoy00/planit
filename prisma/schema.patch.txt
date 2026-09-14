@@ -1,2 +1,0 @@
-User: add nullable acquisitionSource, acquisitionCampaign, acquisitionUseCase plus indexes.
-Poll: add nullable acquisitionSource, acquisitionCampaign, acquisitionUseCase plus indexes.

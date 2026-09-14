@@ -7,8 +7,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// ── NextAuth tables ──────────────────────────────────────────────────────────
-
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -23,7 +21,6 @@ model Account {
   id_token           String? @db.Text
   session_state      String?
   user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@unique([provider, providerAccountId])
 }
 
@@ -39,28 +36,28 @@ model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-
   @@unique([identifier, token])
 }
 
-// ── Creator user ─────────────────────────────────────────────────────────────
-
 model User {
-  id            String            @id @default(cuid())
-  name          String?
-  email         String?           @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  groups        Group[]
-  polls         Poll[]
-  series        RecurringSeries[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id                  String            @id @default(cuid())
+  name                String?
+  email               String?           @unique
+  emailVerified       DateTime?
+  image               String?
+  accounts            Account[]
+  sessions            Session[]
+  groups              Group[]
+  polls               Poll[]
+  series              RecurringSeries[]
+  acquisitionSource   String?
+  acquisitionCampaign String?
+  acquisitionUseCase  String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  @@index([acquisitionSource, acquisitionCampaign])
+  @@index([acquisitionUseCase])
 }
-
-// ── Persistent friend groups ─────────────────────────────────────────────────
 
 model Group {
   id        String        @id @default(cuid())
@@ -80,17 +77,9 @@ model GroupMember {
   name      String
   email     String
   createdAt DateTime @default(now())
-
   @@unique([groupId, email])
 }
 
-// ── Recurring plan series ────────────────────────────────────────────────────
-
-/// A recurring series is intentionally small: the latest occurrence is the
-/// template. Closing or cancelling one occurrence clones it, shifts any dated
-/// options/deadline by the cadence, and sends the next poll to the same active
-/// participants. That means edits made to the current poll naturally carry
-/// forward instead of drifting from a hidden second template.
 model RecurringSeries {
   id        String             @id @default(cuid())
   creatorId String
@@ -101,7 +90,6 @@ model RecurringSeries {
   polls     Poll[]
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
-
   @@index([creatorId, active])
 }
 
@@ -110,56 +98,44 @@ enum RecurrenceCadence {
   MONTHLY
 }
 
-// ── Polls ────────────────────────────────────────────────────────────────────
-
 model Poll {
-  id             String        @id @default(cuid())
-  title          String
-  description    String?       @db.Text
-  type           PollType
-  /// IANA zone used to present TIME_POLL options consistently to every voter.
-  /// Date-only polls remain zone-free and are rendered as UTC calendar dates.
-  timeZone       String?
-  status         PollStatus    @default(OPEN)
-  creatorId      String
-  creator        User          @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  groupId        String?
-  group          Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  options        PollOption[]
-  participants   Participant[]
-  joinRequests   JoinRequest[]
-  deadline          DateTime?
-  threshold         Int?
-  allowSuggestions  Boolean       @default(false)
-  /// Put the creator's address in Reply-To, so invitees can answer a person
-  /// rather than a no-reply mailbox. Off unless the creator asks for it — it
-  /// shows their address to everyone on the guest list.
-  replyToCreator    Boolean       @default(false)
-  /// Concrete details that turn a winning option into an actual plan. They are
-  /// included in the result email/page and in calendar exports when present.
-  finalLocation     String?
-  finalNotes        String?       @db.Text
-  /// One link the creator can hand out themselves — group chat, SMS, anywhere.
-  /// Null on polls created before share links existed; minted on first view.
-  /// Unlike a participant token this is public, so it grants nothing on its
-  /// own: it opens a join form, and a vote link is only issued to an address
-  /// that proved it can receive mail.
-  shareToken        String?       @unique @default(cuid())
-  reminderLevel     Int           @default(0)
-  /// Whether nudges are timed from when the poll went out or from when the
-  /// answer is needed. See `lib/reminder-schedule.ts`.
-  reminderSchedule  ReminderSchedule @default(AFTER_SEND)
-  lastReminderAt DateTime?
-  winnerId       String?
-  winner         PollOption?   @relation("PollWinner", fields: [winnerId], references: [id], onDelete: SetNull)
-  votes          Vote[]
-  seriesId       String?
-  series         RecurringSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesSequence Int?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
+  id                  String        @id @default(cuid())
+  title               String
+  description         String?       @db.Text
+  type                PollType
+  timeZone            String?
+  status              PollStatus    @default(OPEN)
+  creatorId           String
+  creator             User          @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  groupId             String?
+  group               Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  options             PollOption[]
+  participants        Participant[]
+  joinRequests        JoinRequest[]
+  deadline            DateTime?
+  threshold           Int?
+  allowSuggestions    Boolean       @default(false)
+  replyToCreator      Boolean       @default(false)
+  finalLocation       String?
+  finalNotes          String?       @db.Text
+  shareToken          String?       @unique @default(cuid())
+  reminderLevel       Int           @default(0)
+  reminderSchedule    ReminderSchedule @default(AFTER_SEND)
+  lastReminderAt      DateTime?
+  winnerId            String?
+  winner              PollOption?   @relation("PollWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  votes               Vote[]
+  seriesId            String?
+  series              RecurringSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesSequence      Int?
+  acquisitionSource   String?
+  acquisitionCampaign String?
+  acquisitionUseCase  String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
   @@unique([seriesId, seriesSequence])
+  @@index([acquisitionSource, acquisitionCampaign])
+  @@index([acquisitionUseCase])
 }
 
 enum PollType {
@@ -175,66 +151,44 @@ enum PollStatus {
   CANCELLED
 }
 
-/// When to chase the people who haven't answered.
-///
-/// `AFTER_SEND` counts from the moment the invitations went out, which is the
-/// only thing to count from when a poll has no deadline. `BEFORE_DEADLINE`
-/// counts back from the moment the answer is actually needed — the nudge that
-/// lands the day before is worth more than the one that lands because the poll
-/// happens to be a day old.
 enum ReminderSchedule {
   AFTER_SEND
   BEFORE_DEADLINE
 }
 
-// ── Poll options ─────────────────────────────────────────────────────────────
-
 model PollOption {
-  id        String     @id @default(cuid())
-  pollId    String
-  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  label            String
-  dateValue        DateTime?
-  endDate          DateTime?
-  suggestedByName  String?
-  order            Int       @default(0)
-  votes     Vote[]
-  wonPolls  Poll[]     @relation("PollWinner")
-  createdAt DateTime   @default(now())
+  id              String     @id @default(cuid())
+  pollId          String
+  poll            Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  label           String
+  dateValue       DateTime?
+  endDate         DateTime?
+  suggestedByName String?
+  order           Int        @default(0)
+  votes           Vote[]
+  wonPolls        Poll[]     @relation("PollWinner")
+  createdAt       DateTime   @default(now())
 }
 
-// ── Participants ─────────────────────────────────────────────────────────────
-
 model Participant {
-  id        String    @id @default(cuid())
-  pollId    String
-  poll      Poll      @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  name      String
-  email     String
-  token     String    @unique @default(cuid())
-  tokenUsed Boolean   @default(false)
-  votedAt   DateTime?
-  optedOut  Boolean   @default(false)
-  // Delivery of the invitation, as reported by the mail provider. Both null
-  // means it has not been attempted; `inviteError` set means it was refused.
+  id           String    @id @default(cuid())
+  pollId       String
+  poll         Poll      @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  name         String
+  email        String
+  token        String    @unique @default(cuid())
+  tokenUsed    Boolean   @default(false)
+  votedAt      DateTime?
+  optedOut     Boolean   @default(false)
   inviteSentAt DateTime?
   inviteError  String?   @db.Text
-  /// Delivery of the final result. A failed result stays retryable from the
-  /// creator's poll page instead of disappearing into a server log.
   resultSentAt DateTime?
   resultError  String?   @db.Text
-  votes     Vote[]
-  createdAt DateTime  @default(now())
-
+  votes        Vote[]
+  createdAt    DateTime  @default(now())
   @@unique([pollId, email])
 }
 
-// ── Votes ────────────────────────────────────────────────────────────────────
-
-/// One selection by one participant. A date poll records a row per date that
-/// works for that person, so a participant may hold several; single-choice and
-/// yes/no polls record exactly one. Uniqueness is per (participant, option)
-/// rather than per participant — the latter is what allowed only one pick.
 model Vote {
   id            String      @id @default(cuid())
   participantId String
@@ -244,11 +198,8 @@ model Vote {
   optionId      String?
   option        PollOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
   choice        VoteChoice?
-  /// TIME_POLL ballots grade each selected slot. A missing row means the slot
-  /// does not work for that participant.
   preference    VotePreference?
   createdAt     DateTime    @default(now())
-
   @@unique([participantId, optionId])
 }
 
@@ -263,57 +214,26 @@ enum VotePreference {
   AVAILABLE
 }
 
-// ── Self-service joins ───────────────────────────────────────────────────────
-
-/// Someone who followed a share link and asked to join, but has not yet proved
-/// the address is theirs.
-///
-/// Deliberately not a `Participant` yet. The share link is public, so anyone
-/// who has it could otherwise pad a poll with addresses that never answer —
-/// inflating "3 of 12 voted" and earning the sender a pile of unsolicited mail.
-/// A row here becomes a participant only once its token comes back verified.
 model JoinRequest {
-  id        String   @id @default(cuid())
-  pollId    String
-  poll      Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  name      String
-  email     String
-  token     String   @unique @default(cuid())
-  expires   DateTime
-  /// When the verification mail last went out, so a refresh cannot be used to
-  /// mailbomb one address through a public form.
+  id         String   @id @default(cuid())
+  pollId     String
+  poll       Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  name       String
+  email      String
+  token      String   @unique @default(cuid())
+  expires    DateTime
   lastSentAt DateTime @default(now())
-  createdAt DateTime @default(now())
-
+  createdAt  DateTime @default(now())
   @@unique([pollId, email])
 }
 
-// ── Sign-in abuse control ────────────────────────────────────────────────────
-
-/// One sign-in link we were asked to send, recorded so the public login form
-/// cannot be used to mail a stranger repeatedly.
-///
-/// The form takes an address from anyone and sends mail to it — that is what a
-/// magic link is — so without this it is an open relay for one specific
-/// message. Address-bombing campaigns submit a victim's address to hundreds of
-/// such forms at once to bury a real notification, and every one of those sends
-/// costs the sending domain a little more of its reputation.
-///
-/// Deliberately not tied to `User`: most of these are addresses that have no
-/// account and never will. Rows are disposable and pruned by the daily cron.
 model EmailSendAttempt {
   id        String   @id @default(cuid())
   purpose   EmailSendPurpose @default(SIGN_IN)
-  /// Always stored lowercased, as Auth.js normalises the address before this.
   email     String
-  /// Best-effort client address, for capping one source that cycles addresses.
-  /// Null when no forwarding header was present.
   ip        String?
-  /// Optional public-link or account scope. This keeps one shared link or
-  /// account from cycling through addresses without bound.
   scope     String?
   createdAt DateTime @default(now())
-
   @@index([purpose, email, createdAt])
   @@index([purpose, ip, createdAt])
   @@index([purpose, scope, createdAt])
@@ -325,17 +245,8 @@ enum EmailSendPurpose {
   JOIN
 }
 
-// ── Suppression ──────────────────────────────────────────────────────────────
-
-/// Addresses that must never be mailed again, however they got here.
-///
-/// Distinct from `Participant.optedOut`, which means "count me out of this one
-/// plan" and still lets a friend invite you to the next. This is the mail
-/// client's One-Click unsubscribe and it is global and permanent: honouring it
-/// exactly is what keeps complaint rates — and therefore inbox placement — low.
 model EmailSuppression {
   id        String   @id @default(cuid())
-  /// Always stored lowercased; compare case-insensitively.
   email     String   @unique
   reason    String?
   createdAt DateTime @default(now())
