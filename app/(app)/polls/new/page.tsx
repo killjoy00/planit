@@ -1,3 +1,4 @@
+import { cookies } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { PollWizard } from "@/components/poll/PollWizard"
@@ -5,6 +6,7 @@ import { creatorDisplayName } from "@/lib/display-name"
 import { isFastJoinEmail } from "@/lib/fast-join"
 import { utcToLocalInput } from "@/lib/time-zones"
 import { getUseCase } from "@/lib/use-cases"
+import { ACQUISITION_COOKIE, parseAttribution } from "@/lib/acquisition-cookie"
 
 export default async function NewPollPage({
   searchParams,
@@ -15,6 +17,8 @@ export default async function NewPollPage({
   const userId = session!.user!.id!
   const { duplicate, preset } = await searchParams
   const starter = duplicate ? undefined : getUseCase(preset)
+  const cookieStore = await cookies()
+  const attribution = parseAttribution(cookieStore.get(ACQUISITION_COOKIE)?.value)
 
   const [groups, user, source, pollCount] = await Promise.all([
     db.group.findMany({
@@ -24,7 +28,13 @@ export default async function NewPollPage({
     }),
     db.user.findUnique({
       where: { id: userId },
-      select: { name: true, email: true },
+      select: {
+        name: true,
+        email: true,
+        acquisitionSource: true,
+        acquisitionCampaign: true,
+        acquisitionUseCase: true,
+      },
     }),
     duplicate
       ? db.poll.findFirst({
@@ -37,6 +47,17 @@ export default async function NewPollPage({
       : null,
     db.poll.count({ where: { creatorId: userId } }),
   ])
+
+  if (attribution && user && (!user.acquisitionSource || !user.acquisitionCampaign || !user.acquisitionUseCase)) {
+    const data = {
+      ...(!user.acquisitionSource ? { acquisitionSource: attribution.source } : {}),
+      ...(!user.acquisitionCampaign && attribution.campaign ? { acquisitionCampaign: attribution.campaign } : {}),
+      ...(!user.acquisitionUseCase && attribution.useCase ? { acquisitionUseCase: attribution.useCase } : {}),
+    }
+    if (Object.keys(data).length > 0) {
+      await db.user.update({ where: { id: userId }, data })
+    }
+  }
 
   const template = source
     ? {

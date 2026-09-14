@@ -46,18 +46,24 @@ model VerificationToken {
 // ── Creator user ─────────────────────────────────────────────────────────────
 
 model User {
-  id            String            @id @default(cuid())
-  name          String?
-  email         String?           @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  groups        Group[]
-  polls         Poll[]
-  series        RecurringSeries[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id                  String            @id @default(cuid())
+  name                String?
+  email               String?           @unique
+  emailVerified       DateTime?
+  image               String?
+  accounts            Account[]
+  sessions            Session[]
+  groups              Group[]
+  polls               Poll[]
+  series              RecurringSeries[]
+  acquisitionSource   String?
+  acquisitionCampaign String?
+  acquisitionUseCase  String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([acquisitionSource, acquisitionCampaign])
+  @@index([acquisitionUseCase])
 }
 
 // ── Persistent friend groups ─────────────────────────────────────────────────
@@ -142,8 +148,7 @@ model Poll {
   /// One link the creator can hand out themselves — group chat, SMS, anywhere.
   /// Null on polls created before share links existed; minted on first view.
   /// Unlike a participant token this is public, so it grants nothing on its
-  /// own: it opens a join form, and a vote link is only issued to an address
-  /// that proved it can receive mail.
+  /// own: it opens a join form and gives each participant their own ballot.
   shareToken        String?       @unique @default(cuid())
   reminderLevel     Int           @default(0)
   /// Whether nudges are timed from when the poll went out or from when the
@@ -156,10 +161,15 @@ model Poll {
   seriesId       String?
   series         RecurringSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesSequence Int?
+  acquisitionSource   String?
+  acquisitionCampaign String?
+  acquisitionUseCase  String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   @@unique([seriesId, seriesSequence])
+  @@index([acquisitionSource, acquisitionCampaign])
+  @@index([acquisitionUseCase])
 }
 
 enum PollType {
