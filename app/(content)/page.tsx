@@ -6,7 +6,7 @@ import { guidesByDate } from "@/lib/guides"
 import { useCases } from "@/lib/use-cases"
 
 export const metadata: Metadata = {
-  title: "planit — group polls people actually answer",
+  title: { absolute: "planit — group polls people actually answer" },
   description:
     "Free group polls for picking dates, places, and plans. Share one link and friends can vote by name — no account, no app, no endless group chat.",
   alternates: { canonical: "/" },
