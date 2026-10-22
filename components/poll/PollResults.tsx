@@ -90,6 +90,10 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [showTieChooser, setShowTieChooser] = useState(false)
   const [closeError, setCloseError] = useState("")
+  const [editingOptionId, setEditingOptionId] = useState<string | null>(null)
+  const [editedOptionLabel, setEditedOptionLabel] = useState("")
+  const [isSavingOption, setIsSavingOption] = useState(false)
+  const [optionEditError, setOptionEditError] = useState("")
 
   const refresh = useCallback(async () => {
     const fresh = await fetch(`/api/polls/${pollId}/results`)
@@ -181,6 +185,7 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
   const h = hydrated(data)
   const voted = h.participants.filter((p) => p.voted && !p.optedOut).length
   const total = h.participants.filter((p) => !p.optedOut).length
+  const canRenameOptions = h.status === "OPEN" && pollType !== "YES_NO_VETO" && !h.participants.some((p) => p.voted)
   const undelivered = h.participants.filter((p) => !p.inviteDelivered && !p.optedOut)
   const undeliveredResults = h.participants.filter((p) => !p.resultDelivered && !p.optedOut)
   const maxVotes = Math.max(...h.options.map((o) => o.voteCount), 1)
@@ -236,6 +241,49 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
       }
     } finally {
       setRemovingId(null)
+    }
+  }
+
+  function beginOptionEdit(option: Option) {
+    setEditingOptionId(option.id)
+    setEditedOptionLabel(option.label)
+    setOptionEditError("")
+  }
+
+  function cancelOptionEdit() {
+    setEditingOptionId(null)
+    setEditedOptionLabel("")
+    setOptionEditError("")
+  }
+
+  async function saveOptionName() {
+    if (!editingOptionId || isSavingOption) return
+    const label = editedOptionLabel.trim()
+    if (!label) return setOptionEditError("Enter an option name.")
+    setIsSavingOption(true)
+    setOptionEditError("")
+    try {
+      const response = await fetch(`/api/polls/${pollId}/options`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ optionId: editingOptionId, label }),
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok) {
+        setOptionEditError(typeof result?.error === "string" ? result.error : "Could not rename this option.")
+        await refresh()
+        return
+      }
+      setData((current) => ({
+        ...current,
+        options: current.options.map((option) => option.id === result.id ? { ...option, label: result.label } : option),
+      }))
+      cancelOptionEdit()
+      router.refresh()
+    } catch {
+      setOptionEditError("Something went wrong. Try again.")
+    } finally {
+      setIsSavingOption(false)
     }
   }
 
@@ -366,6 +414,9 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
           )}
         </div>
         {closeError && !showTieChooser && <p className="mb-3 text-sm text-red-600">{closeError}</p>}
+        {h.status === "OPEN" && pollType !== "YES_NO_VETO" && !canRenameOptions && (
+          <p className="mb-3 text-xs text-gray-500">Option names are locked after the first vote, so no one&apos;s vote changes meaning.</p>
+        )}
 
         {pollType !== "YES_NO_VETO" ? (
           <div className="space-y-3">
@@ -379,14 +430,47 @@ export function PollResults({ pollId, initialData, pollType, icsAvailable: initi
                 <div key={opt.id} className="flex items-center gap-3">
                   <div className="flex-1">
                     <div className="flex justify-between text-sm mb-0.5 gap-2">
-                      <span className="font-medium text-gray-800">
-                        {opt.label}
-                        {opt.suggestedByName && (
-                          <span className="ml-2 text-xs font-normal text-indigo-500 bg-indigo-50 rounded px-1.5 py-0.5">
-                            suggested by {opt.suggestedByName}
-                          </span>
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                        {canRenameOptions && editingOptionId === opt.id ? (
+                          <div className="w-full space-y-2">
+                            <label htmlFor={`rename-option-${opt.id}`} className="block text-xs font-medium text-gray-600">Option name</label>
+                            <input
+                              id={`rename-option-${opt.id}`}
+                              type="text"
+                              value={editedOptionLabel}
+                              maxLength={200}
+                              autoFocus
+                              onChange={(event) => setEditedOptionLabel(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") { event.preventDefault(); void saveOptionName() }
+                                if (event.key === "Escape") cancelOptionEdit()
+                              }}
+                              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                            />
+                            <div className="flex items-center gap-3">
+                              <button type="button" disabled={isSavingOption || !editedOptionLabel.trim()} onClick={saveOptionName} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                                {isSavingOption ? "Saving…" : "Save name"}
+                              </button>
+                              <button type="button" disabled={isSavingOption} onClick={cancelOptionEdit} className="text-xs text-gray-500 hover:underline disabled:opacity-50">Cancel</button>
+                            </div>
+                            {optionEditError && <p role="alert" className="text-xs text-red-600">{optionEditError}</p>}
+                          </div>
+                        ) : (
+                          <>
+                            <span className="font-medium text-gray-800">{opt.label}</span>
+                            {opt.suggestedByName && (
+                              <span className="text-xs font-normal text-indigo-500 bg-indigo-50 rounded px-1.5 py-0.5">
+                                suggested by {opt.suggestedByName}
+                              </span>
+                            )}
+                            {canRenameOptions && (
+                              <button type="button" onClick={() => beginOptionEdit(opt)} className="text-xs text-indigo-600 hover:underline" aria-label={`Edit name for ${opt.label}`}>
+                                Edit name
+                              </button>
+                            )}
+                          </>
                         )}
-                      </span>
+                      </div>
                       <span className="text-gray-500">
                         {pollType === "TIME_POLL"
                           ? `${opt.voteCount} available · ${opt.idealCount} ideal`

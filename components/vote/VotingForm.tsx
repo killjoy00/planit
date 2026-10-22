@@ -71,7 +71,11 @@ export function VotingForm({
         : pollType === "TIME_POLL"
           ? { preferences: Object.entries(preferences).map(([optionId, preference]) => ({ optionId, preference })) }
           : { optionIds: selectedIds }
-    const body = { ...voteBody, knownOptionIds: options.map((option) => option.id) }
+    const body = {
+      ...voteBody,
+      knownOptionIds: options.map((option) => option.id),
+      knownOptionLabels: options.map((option) => ({ id: option.id, label: option.label })),
+    }
 
     if (
       pollType === "YES_NO_VETO"

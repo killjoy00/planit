@@ -15,6 +15,7 @@ const schema = z.object({
     preference: z.enum(["IDEAL", "AVAILABLE"]),
   })).max(MAX_OPTIONS_PER_POLL).optional(),
   knownOptionIds: z.array(z.string()).max(MAX_OPTIONS_PER_POLL).optional(),
+  knownOptionLabels: z.array(z.object({ id: z.string(), label: z.string().max(200) })).max(MAX_OPTIONS_PER_POLL).optional(),
 })
 
 const ballotMessages: Record<BallotError["code"], { message: string; status: number }> = {
@@ -26,7 +27,7 @@ const ballotMessages: Record<BallotError["code"], { message: string; status: num
   MULTIPLE_NOT_ALLOWED: { message: "Only one option can be selected.", status: 400 },
   AVAILABILITY_REQUIRED: { message: "Mark at least one time as ideal or workable.", status: 400 },
   UNKNOWN_OPTION: { message: "Unknown option.", status: 400 },
-  OPTIONS_CHANGED: { message: "The choices changed while this ballot was open. Reloading the latest version…", status: 409 },
+  OPTIONS_CHANGED: { message: "The option names or choices changed while this ballot was open. Reloading the latest version…", status: 409 },
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {

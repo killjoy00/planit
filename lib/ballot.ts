@@ -32,6 +32,8 @@ export interface BallotInput {
   }>
   /** Complete option IDs shown when this ballot was rendered. */
   knownOptionIds?: string[]
+  /** Label snapshot shown to the voter; prevents stale ballots after renames. */
+  knownOptionLabels?: Array<{ id: string; label: string }>
 }
 
 export async function commitBallot(token: string, input: BallotInput) {
@@ -61,6 +63,13 @@ export async function commitBallot(token: string, input: BallotInput) {
     if (input.knownOptionIds) {
       const knownIds = [...new Set(input.knownOptionIds)]
       if (knownIds.length !== validIds.size || knownIds.some((optionId) => !validIds.has(optionId))) {
+        throw new BallotError("OPTIONS_CHANGED")
+      }
+    }
+
+    if (input.knownOptionLabels) {
+      const labels = new Map(input.knownOptionLabels.map((option) => [option.id, option.label]))
+      if (labels.size !== validIds.size || participant.poll.options.some((option) => labels.get(option.id) !== option.label)) {
         throw new BallotError("OPTIONS_CHANGED")
       }
     }
