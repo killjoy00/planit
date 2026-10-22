@@ -4,8 +4,11 @@ import { pollMutationLockKey } from "./poll-closing.ts"
 export type RenameOptionErrorCode = "NOT_FOUND" | "NOT_EDITABLE" | "VOTING_STARTED" | "INVALID_LABEL"
 
 export class RenameOptionError extends Error {
-  constructor(readonly code: RenameOptionErrorCode) {
+  readonly code: RenameOptionErrorCode
+
+  constructor(code: RenameOptionErrorCode) {
     super(code)
+    this.code = code
   }
 }
 
